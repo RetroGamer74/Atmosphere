@@ -41,6 +41,16 @@ static OverrideKey g_default_override_key = {
     .override_by_default = true
 };
 
+/***********************************************************/
+/* --------- ADDED BY RETROGAMER_74 ************************/
+/***********************************************************/
+
+static OverrideProdinfo g_default_override_prodinfo = {
+    .allow_write = false
+};
+
+/***********************************************************/
+
 struct HblOverrideConfig {
     OverrideKey override_key;
     u64 title_id;
@@ -58,6 +68,13 @@ static HblOverrideConfig g_hbl_override_config = {
 
 /* Static buffer for loader.ini contents at runtime. */
 static char g_config_ini_data[0x800];
+
+/* ------------- MOD BY RETROGAMER_74 ---------------- */
+/*******************************************************/
+/* Static buffer for prodinfo.ini contents at runtime. */
+static char g_config_prodinfo_ini_data[0x800];
+/*******************************************************/
+
 
 /* Backup file for CAL0 partition. */
 static constexpr size_t ProdinfoSize = 0x8000;
@@ -142,6 +159,7 @@ void Utils::InitializeThreadFunc(void *args) {
             }
             
             /* NOTE: g_cal0_file is intentionally not closed here. This prevents any other process from opening it. */
+
             memset(g_cal0_storage_backup, 0, sizeof(g_cal0_storage_backup));
             memset(g_cal0_backup, 0, sizeof(g_cal0_backup));
         }
@@ -199,6 +217,10 @@ void Utils::InitializeThreadFunc(void *args) {
     }
     
     Utils::RefreshConfiguration();
+
+    /**** ADDED BY RETROGAMER_74 ********/
+    Utils::RefreshProdinfoConfiguration();
+    /************************************/
     
     /* Initialize set:sys. */
     setsysInitialize();
@@ -432,6 +454,14 @@ bool Utils::HasFlag(u64 tid, const char *flag) {
     return HasTitleFlag(tid, flag) || (IsHblTid(tid) && HasHblFlag(flag));
 }
 
+/*********************************************************/
+/****** ADDED BY RETROGAMER_74 ***************************/
+/*********************************************************/
+bool Utils::AllowProdinfoWrite() {
+    return g_default_override_prodinfo.allow_write;
+}
+/*********************************************************/
+
 bool Utils::HasSdMitMFlag(u64 tid) {
     if (IsHblTid(tid)) {
         return true;
@@ -486,6 +516,25 @@ bool Utils::HasOverrideButton(u64 tid) {
     return HasOverrideKey(&title_cfg);
 }
 
+/*********************************************************/
+/***** ADDED BY RETROGAMER_74 ****************************/
+/*********************************************************/
+
+static OverrideProdinfo ParseOverrideProdinfo(const char *value) {
+    OverrideProdinfo cfg;
+    
+    /* Parse on by default. */
+    if (value[0] == '0') {
+        cfg.allow_write = false;
+    } else {
+        cfg.allow_write = true;
+    }
+    
+    return cfg;
+}
+/*********************************************************/
+
+
 static OverrideKey ParseOverrideKey(const char *value) {
     OverrideKey cfg;
     
@@ -539,6 +588,17 @@ static OverrideKey ParseOverrideKey(const char *value) {
     }
     
     return cfg;
+}
+
+static int FsMitmIniHandlerProdinfo(void *user, const char *section, const char *name, const char *value) {
+    if(strcasecmp(section, "config") == 0) {
+    	if(strcasecmp(name,"allow_write") == 0)
+		g_default_override_prodinfo = ParseOverrideProdinfo(value);
+    }  else {
+	return 0;
+    }
+
+    return 1;
 }
 
 static int FsMitmIniHandler(void *user, const char *section, const char *name, const char *value) {
@@ -607,6 +667,33 @@ OverrideKey Utils::GetTitleOverrideKey(u64 tid) {
     
     return cfg;
 }
+
+/****************************************************************/
+/* ---------------- ADDED BY RETROGAMER_74 -------------------- */
+/****************************************************************/
+void Utils::RefreshProdinfoConfiguration() {
+    FsFile config_file;
+    if (R_FAILED(fsFsOpenFile(&g_sd_filesystem, "/atmosphere/prodinfo.ini", FS_OPEN_READ, &config_file))) {
+        return;
+    }
+   
+    u64 size;
+    if (R_FAILED(fsFileGetSize(&config_file, &size))) {
+        return;
+    }
+   
+    size = std::min(size, (decltype(size))0x7FF);
+   
+    /* Read in string. */
+    std::fill(g_config_prodinfo_ini_data, g_config_prodinfo_ini_data + 0x800, 0);
+    size_t r_s;
+    fsFileRead(&config_file, 0, g_config_prodinfo_ini_data, size, &r_s);
+    fsFileClose(&config_file);
+   
+    ini_parse_string(g_config_prodinfo_ini_data, FsMitmIniHandlerProdinfo, NULL);
+}
+
+/****************************************************************/
 
 void Utils::RefreshConfiguration() {
     FsFile config_file;

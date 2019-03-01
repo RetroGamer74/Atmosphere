@@ -42,6 +42,14 @@ struct OverrideKey {
     bool override_by_default;
 };
 
+/***********************************************************/
+/* --------- ADDED BY RETROGAMER_74 ************************/
+/***********************************************************/
+struct OverrideProdinfo {
+    bool allow_write;
+};
+/***********************************************************/
+
 class Utils {
     public:
         static bool IsSdInitialized();
@@ -70,7 +78,7 @@ class Utils {
         static bool HasHblFlag(const char *flag);
         static bool HasGlobalFlag(const char *flag);
         static bool HasFlag(u64 tid, const char *flag);
-        
+        static bool AllowProdinfoWrite(); 
         static bool HasSdMitMFlag(u64 tid);
         static bool HasSdDisableMitMFlag(u64 tid);
         
@@ -86,4 +94,5 @@ class Utils {
         static Result GetSettingsItemValue(const char *name, const char *key, void *out, size_t max_size, u64 *out_size);
     private:
         static void RefreshConfiguration();
+        static void RefreshProdinfoConfiguration();
 };

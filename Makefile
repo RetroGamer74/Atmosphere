@@ -23,10 +23,11 @@ stratosphere: exosphere
 troposphere: stratosphere
 	$(MAKE) -C troposphere all
 
-sept: exosphere
-	$(MAKE) -C sept all
+#sept: exosphere
+#	$(MAKE) -C sept all
 
-fusee: exosphere stratosphere sept
+#fusee: exosphere stratosphere sept
+fusee: exosphere stratosphere
 	$(MAKE) -C $@ all
 
 clean:
@@ -54,7 +55,6 @@ dist: all
 	mkdir -p atmosphere-$(AMSVER)/atmosphere/titles/0100000000000034
 	mkdir -p atmosphere-$(AMSVER)/atmosphere/titles/0100000000000032
 	cp fusee/fusee-primary/fusee-primary.bin atmosphere-$(AMSVER)/atmosphere/reboot_payload.bin
-	mkdir -p atmosphere-$(AMSVER)/atmosphere/titles/010000000000000D
 	cp fusee/fusee-secondary/fusee-secondary.bin atmosphere-$(AMSVER)/atmosphere/fusee-secondary.bin
 	cp fusee/fusee-secondary/fusee-secondary.bin atmosphere-$(AMSVER)/sept/payload.bin
 	cp sept/sept-primary/sept-primary.bin atmosphere-$(AMSVER)/sept/sept-primary.bin
@@ -70,7 +70,6 @@ dist: all
 	cp troposphere/reboot_to_payload/reboot_to_payload.nro atmosphere-$(AMSVER)/switch/reboot_to_payload.nro
 	mkdir -p atmosphere-$(AMSVER)/atmosphere/titles/0100000000000032/flags
 	touch atmosphere-$(AMSVER)/atmosphere/titles/0100000000000032/flags/boot2.flag
-	cp stratosphere/dmnt/dmnt.nsp atmosphere-$(AMSVER)/atmosphere/titles/010000000000000D/exefs.nsp
 	cd atmosphere-$(AMSVER); zip -r ../atmosphere-$(AMSVER).zip ./*; cd ../;
 	rm -r atmosphere-$(AMSVER)
 	mkdir out
