@@ -18,6 +18,8 @@
 #include <switch.h>
 #include <stratosphere.hpp>
 
+#include "dmnt_results.hpp"
+
 struct MemoryRegionExtents {
     u64 base;
     u64 size;
@@ -25,6 +27,7 @@ struct MemoryRegionExtents {
 
 struct CheatProcessMetadata {
     u64 process_id;
+    u64 title_id;
     MemoryRegionExtents main_nso_extents;
     MemoryRegionExtents heap_extents;
     MemoryRegionExtents alias_extents;
@@ -42,4 +45,14 @@ struct CheatEntry {
     bool enabled;
     uint32_t cheat_id;
     CheatDefinition definition;
+};
+
+struct FrozenAddressValue {
+    u64 value;
+    u8 width;
+};
+
+struct FrozenAddressEntry {
+    u64 address;
+    FrozenAddressValue value;
 };

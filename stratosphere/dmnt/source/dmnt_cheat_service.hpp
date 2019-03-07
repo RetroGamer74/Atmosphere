@@ -25,12 +25,14 @@ enum DmntCheatCmd {
     DmntCheat_Cmd_HasCheatProcess = 65000,
     DmntCheat_Cmd_GetCheatProcessEvent = 65001,
     DmntCheat_Cmd_GetCheatProcessMetadata = 65002,
+    DmntCheat_Cmd_ForceOpenCheatProcess = 65003,
     
     /* Interact with Memory */
     DmntCheat_Cmd_GetCheatProcessMappingCount = 65100,
     DmntCheat_Cmd_GetCheatProcessMappings = 65101,
     DmntCheat_Cmd_ReadCheatProcessMemory = 65102,
     DmntCheat_Cmd_WriteCheatProcessMemory = 65103,
+    DmntCheat_Cmd_QueryCheatProcessMemory = 65104,
     
     /* Interact with Cheats */
     DmntCheat_Cmd_GetCheatCount = 65200,
@@ -43,7 +45,9 @@ enum DmntCheatCmd {
     /* Interact with Frozen Addresses */
     DmntCheat_Cmd_GetFrozenAddressCount = 65300,
     DmntCheat_Cmd_GetFrozenAddresses = 65301,
-    DmntCheat_Cmd_ToggleAddressFrozen = 65302,
+    DmntCheat_Cmd_GetFrozenAddress = 65302,
+    DmntCheat_Cmd_EnableFrozenAddress = 65303,
+    DmntCheat_Cmd_DisableFrozenAddress = 65304,
 };
 
 class DmntCheatService final : public IServiceObject {
@@ -51,11 +55,13 @@ class DmntCheatService final : public IServiceObject {
         void HasCheatProcess(Out<bool> out);
         void GetCheatProcessEvent(Out<CopiedHandle> out_event);
         Result GetCheatProcessMetadata(Out<CheatProcessMetadata> out_metadata);
+        Result ForceOpenCheatProcess();
         
         Result GetCheatProcessMappingCount(Out<u64> out_count);
         Result GetCheatProcessMappings(OutBuffer<MemoryInfo> mappings, Out<u64> out_count, u64 offset);
         Result ReadCheatProcessMemory(OutBuffer<u8> buffer, u64 address, u64 out_size);
         Result WriteCheatProcessMemory(InBuffer<u8> buffer, u64 address, u64 in_size);
+        Result QueryCheatProcessMemory(Out<MemoryInfo> mapping, u64 address);
         
         Result GetCheatCount(Out<u64> out_count);
         Result GetCheats(OutBuffer<CheatEntry> cheats, Out<u64> out_count, u64 offset);
@@ -65,19 +71,23 @@ class DmntCheatService final : public IServiceObject {
         Result RemoveCheat(u32 cheat_id);
         
         Result GetFrozenAddressCount(Out<u64> out_count);
-        Result GetFrozenAddresses(OutBuffer<uintptr_t> addresses, Out<u64> out_count, u64 offset);
-        Result ToggleAddressFrozen(uintptr_t address);
+        Result GetFrozenAddresses(OutBuffer<FrozenAddressEntry> addresses, Out<u64> out_count, u64 offset);
+        Result GetFrozenAddress(Out<FrozenAddressEntry> entry, u64 address);
+        Result EnableFrozenAddress(Out<u64> out_value, u64 address, u64 width);
+        Result DisableFrozenAddress(u64 address);
 
     public:
         DEFINE_SERVICE_DISPATCH_TABLE {
             MakeServiceCommandMeta<DmntCheat_Cmd_HasCheatProcess, &DmntCheatService::HasCheatProcess>(),
             MakeServiceCommandMeta<DmntCheat_Cmd_GetCheatProcessEvent, &DmntCheatService::GetCheatProcessEvent>(),
             MakeServiceCommandMeta<DmntCheat_Cmd_GetCheatProcessMetadata, &DmntCheatService::GetCheatProcessMetadata>(),
+            MakeServiceCommandMeta<DmntCheat_Cmd_ForceOpenCheatProcess, &DmntCheatService::ForceOpenCheatProcess>(),
 
             MakeServiceCommandMeta<DmntCheat_Cmd_GetCheatProcessMappingCount, &DmntCheatService::GetCheatProcessMappingCount>(),
             MakeServiceCommandMeta<DmntCheat_Cmd_GetCheatProcessMappings, &DmntCheatService::GetCheatProcessMappings>(),
             MakeServiceCommandMeta<DmntCheat_Cmd_ReadCheatProcessMemory, &DmntCheatService::ReadCheatProcessMemory>(),
             MakeServiceCommandMeta<DmntCheat_Cmd_WriteCheatProcessMemory, &DmntCheatService::WriteCheatProcessMemory>(),
+            MakeServiceCommandMeta<DmntCheat_Cmd_QueryCheatProcessMemory, &DmntCheatService::QueryCheatProcessMemory>(),
 
             MakeServiceCommandMeta<DmntCheat_Cmd_GetCheatCount, &DmntCheatService::GetCheatCount>(),
             MakeServiceCommandMeta<DmntCheat_Cmd_GetCheats, &DmntCheatService::GetCheats>(),
@@ -88,6 +98,8 @@ class DmntCheatService final : public IServiceObject {
 
             MakeServiceCommandMeta<DmntCheat_Cmd_GetFrozenAddressCount, &DmntCheatService::GetFrozenAddressCount>(),
             MakeServiceCommandMeta<DmntCheat_Cmd_GetFrozenAddresses, &DmntCheatService::GetFrozenAddresses>(),
-            MakeServiceCommandMeta<DmntCheat_Cmd_ToggleAddressFrozen, &DmntCheatService::ToggleAddressFrozen>(),
+            MakeServiceCommandMeta<DmntCheat_Cmd_GetFrozenAddress, &DmntCheatService::GetFrozenAddress>(),
+            MakeServiceCommandMeta<DmntCheat_Cmd_EnableFrozenAddress, &DmntCheatService::EnableFrozenAddress>(),
+            MakeServiceCommandMeta<DmntCheat_Cmd_DisableFrozenAddress, &DmntCheatService::DisableFrozenAddress>(),
         };
 };

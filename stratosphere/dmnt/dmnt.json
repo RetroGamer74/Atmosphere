@@ -26,8 +26,10 @@
         "sfdnsres",
         "bsdcfg",
         "set",
+        "set:sys",
         "fsp-srv",
-        "fatal:u"
+        "fatal:u",
+        "hid"
     ],
 	"service_host":	[
         "dmnt:-",
@@ -106,7 +108,8 @@
 				"svcReadDebugProcessMemory":	"0x6a",
 				"svcWriteDebugProcessMemory":	"0x6b",
 				"svcSetHardwareBreakPoint":	"0x6c",
-				"svcGetDebugThreadParam":	"0x6d"
+				"svcGetDebugThreadParam":	"0x6d",
+				"svcCallSecureMonitor":	"0x7f"
 			}
 		}, {
 			"type":	"min_kernel_version",

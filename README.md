@@ -1,16 +1,3 @@
-Why this Fork?
-==============
-
-This fork is intended to provide some particular features for [RetroReloaded CFW](https://github.com/RetroGamer74/RR_RetroReloaded).
-
-You can manage this features thru [RetroReloaded Toolkit](https://github.com/RetroGamer74/RetroReloaded_Updater).
-
-By the way this features consist of:
-
-* Enable RW/RO PRODINFO. ( Mainly done to allow to run [incognito](https://github.com/blawar/incognito) )
-
-* Enable / Disable Sys-FTP. Built-in FTP as background service. ( Forked from main repository. You can find it [here](https://github.com/RetroGamer74/sys-ftpd) )
-
 
 ![Banner](img/banner.png?raw=true)
 =====

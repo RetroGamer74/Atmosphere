@@ -16,6 +16,7 @@
  
 #pragma once
 #include <switch.h>
+#include <stdarg.h>
 #include <stratosphere.hpp>
 
 #include "dmnt_cheat_types.hpp"
@@ -27,12 +28,17 @@ enum CheatVmOpcodeType : u32 {
     CheatVmOpcodeType_ControlLoop = 3,
     CheatVmOpcodeType_LoadRegisterStatic = 4,
     CheatVmOpcodeType_LoadRegisterMemory = 5,
-    CheatVmOpcodeType_StoreToRegisterAddress = 6,
+    CheatVmOpcodeType_StoreStaticToAddress = 6,
     CheatVmOpcodeType_PerformArithmeticStatic = 7,
     CheatVmOpcodeType_BeginKeypressConditionalBlock = 8,
     
     /* These are not implemented by Gateway's VM. */
     CheatVmOpcodeType_PerformArithmeticRegister = 9,
+    CheatVmOpcodeType_StoreRegisterToAddress = 10,
+    
+    /* This is a meta entry, and not a real opcode. */
+    /* This is to facilitate multi-nybble instruction decoding in the future. */
+    CheatVmOpcodeType_ExtendedWidth = 12,
 };
 
 enum MemoryAccessType : u32 {
@@ -65,6 +71,12 @@ enum RegisterArithmeticType : u32 {
     RegisterArithmeticType_None = 9,
 };
 
+enum StoreRegisterOffsetType : u32 {
+    StoreRegisterOffsetType_None = 0,
+    StoreRegisterOffsetType_Reg = 1,
+    StoreRegisterOffsetType_Imm = 2,
+};
+
 union VmInt {
     u8  bit8;
     u16 bit16;
@@ -76,7 +88,7 @@ struct StoreStaticOpcode {
     u32 bit_width;
     MemoryAccessType mem_type;
     u32 offset_register;
-    u64 relative_address;
+    u64 rel_address;
     VmInt value;
 };
 
@@ -84,7 +96,7 @@ struct BeginConditionalOpcode {
     u32 bit_width;
     MemoryAccessType mem_type;
     ConditionalComparisonType cond_type;
-    u64 relative_address;
+    u64 rel_address;
     VmInt value;
 };
 
@@ -106,10 +118,10 @@ struct LoadRegisterMemoryOpcode {
     MemoryAccessType mem_type;
     u32 reg_index;
     bool load_from_reg;
-    u64 relative_address;
+    u64 rel_address;
 };
 
-struct StoreToRegisterAddressOpcode {
+struct StoreStaticToAddressOpcode {
     u32 bit_width;
     u32 reg_index;
     bool increment_reg;
@@ -139,8 +151,20 @@ struct PerformArithmeticRegisterOpcode {
     VmInt value;
 };
 
+struct StoreRegisterToAddressOpcode {
+    u32 bit_width;
+    u32 str_reg_index;
+    u32 addr_reg_index;
+    bool increment_reg;
+    StoreRegisterOffsetType ofs_type;
+    u32 ofs_reg_index;
+    u64 rel_address;
+};
+
+
 struct CheatVmOpcode {
     CheatVmOpcodeType opcode;
+    bool begin_conditional_block;
     union {
         StoreStaticOpcode store_static;
         BeginConditionalOpcode begin_cond;
@@ -148,10 +172,11 @@ struct CheatVmOpcode {
         ControlLoopOpcode ctrl_loop;
         LoadRegisterStaticOpcode ldr_static;
         LoadRegisterMemoryOpcode ldr_memory;
-        StoreToRegisterAddressOpcode str_regaddr;
+        StoreStaticToAddressOpcode str_static;
         PerformArithmeticStaticOpcode perform_math_static;
         BeginKeypressConditionalOpcode begin_keypress_cond;
         PerformArithmeticRegisterOpcode perform_math_reg;
+        StoreRegisterToAddressOpcode str_register;
     };
 };
 
@@ -162,14 +187,24 @@ class DmntCheatVm {
     private:
         size_t num_opcodes = 0;
         size_t instruction_ptr = 0;
+        size_t condition_depth = 0;
+        bool decode_success = false;
         u32 program[MaximumProgramOpcodeCount] = {0};
         u64 registers[NumRegisters] = {0};
         size_t loop_tops[NumRegisters] = {0};
     private:
         bool DecodeNextOpcode(CheatVmOpcode *out);
         void SkipConditionalBlock();
+        void ResetState();
+        
+        /* For debugging. These will be IFDEF'd out normally. */
+        void OpenDebugLogFile();
+        void CloseDebugLogFile();
+        void LogToDebugFile(const char *format, ...);
+        void LogOpcode(const CheatVmOpcode *opcode);
         
         static u64 GetVmInt(VmInt value, u32 bit_width);
+        static u64 GetCheatProcessAddress(const CheatProcessMetadata* metadata, MemoryAccessType mem_type, u64 rel_address);
     public:
         DmntCheatVm() { }
         
@@ -177,5 +212,10 @@ class DmntCheatVm {
             return this->num_opcodes;
         }
         
+        bool LoadProgram(const CheatEntry *cheats, size_t num_cheats);
         void Execute(const CheatProcessMetadata *metadata);
+#ifdef DMNT_CHEAT_VM_DEBUG_LOG
+    private:
+        FILE *debug_log_file = NULL;
+#endif
 };

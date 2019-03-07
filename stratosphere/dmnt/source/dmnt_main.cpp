@@ -26,6 +26,7 @@
 #include "dmnt_service.hpp"
 #include "dmnt_cheat_service.hpp"
 #include "dmnt_cheat_manager.hpp"
+#include "dmnt_config.hpp"
 
 extern "C" {
     extern u32 __start__;
@@ -56,6 +57,8 @@ void __libnx_initheap(void) {
 
 void __appInit(void) {
     Result rc;
+    
+    SetFirmwareVersionForLibnx();
     
     rc = smInitialize();
     if (R_FAILED(rc)) {
@@ -96,6 +99,16 @@ void __appInit(void) {
         fatalSimple(rc);
     }
     
+    rc = setsysInitialize();
+    if (R_FAILED(rc)) {
+        fatalSimple(rc);
+    }
+    
+    rc = hidInitialize();
+    if (R_FAILED(rc)) {
+        fatalSimple(rc);
+    }
+    
     rc = fsInitialize();
     if (R_FAILED(rc)) {
         fatalSimple(rc);
@@ -113,6 +126,8 @@ void __appExit(void) {
     /* Cleanup services. */
     fsdevUnmountAll();
     fsExit();
+    hidExit();
+    setsysExit();
     setExit();
     lrExit();
     nsdevExit();
@@ -126,6 +141,9 @@ int main(int argc, char **argv)
 {
     consoleDebugInit(debugDevice_SVC);
     
+    /* Initialize configuration manager. */
+    DmntConfigManager::RefreshConfiguration();
+    
     /* Start cheat manager. */
     DmntCheatManager::InitializeCheatManager();
     
@@ -133,7 +151,11 @@ int main(int argc, char **argv)
     auto server_manager = new WaitableManager(5);
     
     /* Create services. */
-    server_manager->AddWaitable(new ServiceServer<DebugMonitorService>("dmnt:-", 4));
+    
+    /* TODO: Implement rest of dmnt:- in ams.tma development branch. */
+    /* server_manager->AddWaitable(new ServiceServer<DebugMonitorService>("dmnt:-", 4)); */
+    
+    
     server_manager->AddWaitable(new ServiceServer<DmntCheatService>("dmnt:cht", 1));
 
     /* Loop forever, servicing our services. */
