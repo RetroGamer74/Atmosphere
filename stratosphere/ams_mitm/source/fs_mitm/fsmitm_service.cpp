@@ -28,6 +28,8 @@
 #include "fsmitm_romstorage.hpp"
 #include "fsmitm_layeredrom.hpp"
 
+#include "fs_subdirectory_filesystem.hpp"
+
 #include "../debug.hpp"
 
 static HosMutex g_StorageCacheLock;
@@ -80,6 +82,81 @@ void FsMitmService::PostProcess(IMitmServiceObject *obj, IpcResponseContext *ctx
     }
 }
 
+Result FsMitmService::OpenHblWebContentFileSystem(Out<std::shared_ptr<IFileSystemInterface>> &out_fs) {
+    std::shared_ptr<IFileSystemInterface> fs = nullptr;
+    u32 out_domain_id = 0;
+    Result rc = 0;
+    
+    ON_SCOPE_EXIT {
+        if (R_SUCCEEDED(rc)) {
+            out_fs.SetValue(std::move(fs));
+            if (out_fs.IsDomain()) {
+                out_fs.ChangeObjectId(out_domain_id);
+            }
+        }
+    };
+    
+    /* Mount the SD card using fs.mitm's session. */
+    FsFileSystem sd_fs;
+    rc = fsMountSdcard(&sd_fs);
+    if (R_SUCCEEDED(rc)) {
+        fs = std::make_shared<IFileSystemInterface>(std::make_unique<SubDirectoryFileSystem>(std::make_shared<ProxyFileSystem>(sd_fs), AtmosphereHblWebContentDir));
+        if (out_fs.IsDomain()) {
+            out_domain_id = sd_fs.s.object_id;
+        }
+    }
+
+    return rc;
+}
+
+Result FsMitmService::OpenFileSystemWithPatch(Out<std::shared_ptr<IFileSystemInterface>> out_fs, u64 title_id, u32 filesystem_type) {
+    /* Check for eligibility. */
+    {
+        FsDir d;
+        if (!Utils::IsWebAppletTid(this->title_id) || filesystem_type != FsFileSystemType_ContentManual || !Utils::IsHblTid(title_id) ||
+            R_FAILED(Utils::OpenSdDir(AtmosphereHblWebContentDir, &d))) {
+            return RESULT_FORWARD_TO_SESSION;
+        }
+        fsDirClose(&d);
+    }
+
+    /* If there's an existing filesystem, don't override. */
+    /* TODO: Multiplex, overriding existing content with HBL content. */
+    {
+        FsFileSystem fs;
+        if (R_SUCCEEDED(fsOpenFileSystemWithPatchFwd(this->forward_service.get(), &fs, title_id, static_cast<FsFileSystemType>(filesystem_type)))) {
+            fsFsClose(&fs);
+            return RESULT_FORWARD_TO_SESSION;
+        }
+    }
+    
+    return this->OpenHblWebContentFileSystem(out_fs);
+}
+
+Result FsMitmService::OpenFileSystemWithId(Out<std::shared_ptr<IFileSystemInterface>> out_fs, InPointer<char> path, u64 title_id, u32 filesystem_type) {
+    /* Check for eligibility. */
+    {
+        FsDir d;
+        if (!Utils::IsWebAppletTid(this->title_id) || filesystem_type != FsFileSystemType_ContentManual || !Utils::IsHblTid(title_id) || 
+            R_FAILED(Utils::OpenSdDir(AtmosphereHblWebContentDir, &d))) {
+            return RESULT_FORWARD_TO_SESSION;
+        }
+        fsDirClose(&d);
+    }
+
+    /* If there's an existing filesystem, don't override. */
+    /* TODO: Multiplex, overriding existing content with HBL content. */
+    {
+        FsFileSystem fs;
+        if (R_SUCCEEDED(fsOpenFileSystemWithIdFwd(this->forward_service.get(), &fs, title_id, static_cast<FsFileSystemType>(filesystem_type), path.pointer))) {
+            fsFsClose(&fs);
+            return RESULT_FORWARD_TO_SESSION;
+        }
+    }
+
+    return this->OpenHblWebContentFileSystem(out_fs);
+}
+
 /* Gate access to the BIS partitions. */
 Result FsMitmService::OpenBisStorage(Out<std::shared_ptr<IStorageInterface>> out_storage, u32 bis_partition_id) {
     std::shared_ptr<IStorageInterface> storage = nullptr;
@@ -99,7 +176,7 @@ Result FsMitmService::OpenBisStorage(Out<std::shared_ptr<IStorageInterface>> out
         FsStorage bis_storage;
         rc = fsOpenBisStorageFwd(this->forward_service.get(), &bis_storage, bis_partition_id);
         if (R_SUCCEEDED(rc)) {
-            const bool is_sysmodule = this->title_id < 0x0100000000001000;
+            const bool is_sysmodule = this->title_id < 0x0100000000001000ul;
             const bool has_bis_write_flag = Utils::HasFlag(this->title_id, "bis_write");
             const bool has_cal0_read_flag = Utils::HasFlag(this->title_id, "cal_read");
             if (bis_partition_id == BisStorageId_Boot0) {
@@ -107,10 +184,7 @@ Result FsMitmService::OpenBisStorage(Out<std::shared_ptr<IStorageInterface>> out
             } else if (bis_partition_id == BisStorageId_Prodinfo) {
                 /* PRODINFO should *never* be writable. */
                 if (is_sysmodule || has_cal0_read_flag) {
-		    if(Utils::AllowProdinfoWrite())
-                    	storage = std::make_shared<IStorageInterface>(new ProxyStorage(bis_storage));
-		    else
-                    	storage = std::make_shared<IStorageInterface>(new ROProxyStorage(bis_storage));
+                    storage = std::make_shared<IStorageInterface>(new ROProxyStorage(bis_storage));
                 } else {
                     /* Do not allow non-sysmodules to read *or* write CAL0. */
                     fsStorageClose(&bis_storage);
@@ -119,6 +193,12 @@ Result FsMitmService::OpenBisStorage(Out<std::shared_ptr<IStorageInterface>> out
             } else {
                 if (is_sysmodule || has_bis_write_flag) {
                     /* Sysmodules should still be allowed to read and write. */
+                    storage = std::make_shared<IStorageInterface>(new ProxyStorage(bis_storage));
+                } else if (Utils::IsHblTid(this->title_id) && 
+                    ((BisStorageId_BcPkg2_1 <= bis_partition_id && bis_partition_id <= BisStorageId_BcPkg2_6) || bis_partition_id == BisStorageId_Boot1)) {
+                    /* Allow HBL to write to boot1 (safe firm) + package2. */
+                    /* This is needed to not break compatibility with ChoiDujourNX, which does not check for write access before beginning an update. */
+                    /* TODO: get fixed so that this can be turned off without causing bricks :/ */
                     storage = std::make_shared<IStorageInterface>(new ProxyStorage(bis_storage));
                 } else {
                     /* Non-sysmodules should be allowed to read. */

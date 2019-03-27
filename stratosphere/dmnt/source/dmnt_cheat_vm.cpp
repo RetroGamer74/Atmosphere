@@ -24,7 +24,7 @@
 void DmntCheatVm::OpenDebugLogFile() {
     #ifdef DMNT_CHEAT_VM_DEBUG_LOG
     CloseDebugLogFile();
-    this->debug_log_file = fopen("cheat_vm_log.txt", "wb");
+    this->debug_log_file = fopen("cheat_vm_log.txt", "ab");
     #endif
 }
 
@@ -142,7 +142,51 @@ void DmntCheatVm::LogOpcode(const CheatVmOpcode *opcode) {
                 case StoreRegisterOffsetType_Imm:
                     this->LogToDebugFile("Rel Addr:  %lx\n", opcode->str_register.rel_address);
                     break;
+                case StoreRegisterOffsetType_MemReg:
+                    this->LogToDebugFile("Mem Type:  %x\n", opcode->str_register.mem_type);
+                    break;
+                case StoreRegisterOffsetType_MemImm:
+                case StoreRegisterOffsetType_MemImmReg:
+                    this->LogToDebugFile("Mem Type:  %x\n", opcode->str_register.mem_type);
+                    this->LogToDebugFile("Rel Addr:  %lx\n", opcode->str_register.rel_address);
+                    break;
             }
+            break;
+        case CheatVmOpcodeType_BeginRegisterConditionalBlock: 
+            this->LogToDebugFile("Opcode: Begin Register Conditional\n");
+            this->LogToDebugFile("Bit Width: %x\n", opcode->begin_reg_cond.bit_width);
+            this->LogToDebugFile("Cond Type: %x\n", opcode->begin_reg_cond.cond_type);
+            this->LogToDebugFile("V Reg Idx: %x\n", opcode->begin_reg_cond.val_reg_index);
+                switch (opcode->begin_reg_cond.comp_type) {
+                    case CompareRegisterValueType_StaticValue:
+                        this->LogToDebugFile("Comp Type: Static Value\n");
+                        this->LogToDebugFile("Value:     %lx\n", opcode->begin_reg_cond.value.bit64);
+                        break;
+                    case CompareRegisterValueType_OtherRegister:
+                        this->LogToDebugFile("Comp Type: Other Register\n");
+                        this->LogToDebugFile("X Reg Idx: %x\n", opcode->begin_reg_cond.other_reg_index);
+                        break;
+                    case CompareRegisterValueType_MemoryRelAddr:
+                        this->LogToDebugFile("Comp Type: Memory Relative Address\n");
+                        this->LogToDebugFile("Mem Type:  %x\n", opcode->begin_reg_cond.mem_type);
+                        this->LogToDebugFile("Rel Addr:  %lx\n", opcode->begin_reg_cond.rel_address);
+                        break;
+                    case CompareRegisterValueType_MemoryOfsReg:
+                        this->LogToDebugFile("Comp Type: Memory Offset Register\n");
+                        this->LogToDebugFile("Mem Type:  %x\n", opcode->begin_reg_cond.mem_type);
+                        this->LogToDebugFile("O Reg Idx: %x\n", opcode->begin_reg_cond.ofs_reg_index);
+                        break;
+                    case CompareRegisterValueType_RegisterRelAddr:
+                        this->LogToDebugFile("Comp Type: Register Relative Address\n");
+                        this->LogToDebugFile("A Reg Idx: %x\n", opcode->begin_reg_cond.addr_reg_index);
+                        this->LogToDebugFile("Rel Addr:  %lx\n", opcode->begin_reg_cond.rel_address);
+                        break;
+                    case CompareRegisterValueType_RegisterOfsReg:
+                        this->LogToDebugFile("Comp Type: Register Offset Register\n");
+                        this->LogToDebugFile("A Reg Idx: %x\n", opcode->begin_reg_cond.addr_reg_index);
+                        this->LogToDebugFile("O Reg Idx: %x\n", opcode->begin_reg_cond.ofs_reg_index);
+                        break;
+                }
             break;
         default:
             this->LogToDebugFile("Unknown opcode: %x\n", opcode->opcode);
@@ -208,6 +252,7 @@ bool DmntCheatVm::DecodeNextOpcode(CheatVmOpcode *out) {
     switch (opcode.opcode) {
         case CheatVmOpcodeType_BeginConditionalBlock:
         case CheatVmOpcodeType_BeginKeypressConditionalBlock:
+        case CheatVmOpcodeType_BeginRegisterConditionalBlock:
             opcode.begin_conditional_block = true;
             break;
         default:
@@ -264,7 +309,7 @@ bool DmntCheatVm::DecodeNextOpcode(CheatVmOpcode *out) {
             {
                 /* 400R0000 VVVVVVVV VVVVVVVV */
                 /* Read additional words. */
-                opcode.ldr_static.reg_index = ((first_dword >> 20) & 0xF);
+                opcode.ldr_static.reg_index = ((first_dword >> 16) & 0xF);
                 opcode.ldr_static.value = (((u64)GetNextDword()) << 32ul) | ((u64)GetNextDword());
             }
             break;
@@ -327,15 +372,16 @@ bool DmntCheatVm::DecodeNextOpcode(CheatVmOpcode *out) {
             break;
         case CheatVmOpcodeType_StoreRegisterToAddress:
             {
-                /* ATSRIOra (aaaaaaaa) */
+                /* ATSRIOxa (aaaaaaaa) */
                 /* A = opcode 10 */
                 /* T = bit width */
                 /* S = src register index */
                 /* R = address register index */
                 /* I = 1 if increment address register, 0 if not increment address register */
-                /* O = offset type, 0 = None, 1 = Register, 2 = Immediate */
-                /* r = offset register (for offset type 1) */
-                /* a = relative address (for offset type 2) */
+                /* O = offset type, 0 = None, 1 = Register, 2 = Immediate, 3 = Memory Region,
+                        4 = Memory Region + Relative Address (ignore address register), 5 = Memory Region + Relative Address */
+                /* x = offset register (for offset type 1), memory type (for offset type 3) */
+                /* a = relative address (for offset type 2+3) */
                 opcode.str_register.bit_width = (first_dword >> 24) & 0xF;
                 opcode.str_register.str_reg_index  = ((first_dword >> 20) & 0xF);
                 opcode.str_register.addr_reg_index = ((first_dword >> 16) & 0xF);
@@ -350,8 +396,68 @@ bool DmntCheatVm::DecodeNextOpcode(CheatVmOpcode *out) {
                     case StoreRegisterOffsetType_Imm:
                         opcode.str_register.rel_address = (((u64)(first_dword & 0xF) << 32ul) | ((u64)GetNextDword()));
                         break;
+                    case StoreRegisterOffsetType_MemReg:
+                        opcode.str_register.mem_type = (MemoryAccessType)((first_dword >> 4) & 0xF);
+                        break;
+                    case StoreRegisterOffsetType_MemImm:
+                    case StoreRegisterOffsetType_MemImmReg:
+                        opcode.str_register.mem_type = (MemoryAccessType)((first_dword >> 4) & 0xF);
+                        opcode.str_register.rel_address = (((u64)(first_dword & 0xF) << 32ul) | ((u64)GetNextDword()));
+                        break;
                     default:
                         opcode.str_register.ofs_type = StoreRegisterOffsetType_None;
+                        break;
+                }
+            }
+            break;
+        case CheatVmOpcodeType_BeginRegisterConditionalBlock:
+            {
+                /* C0TcSX## */
+                /* C0TcS0Ma aaaaaaaa */
+                /* C0TcS1Mr */
+                /* C0TcS2Ra aaaaaaaa */
+                /* C0TcS3Rr */
+                /* C0TcS400 VVVVVVVV (VVVVVVVV) */
+                /* C0TcS5X0 */
+                /* C0 = opcode 0xC0 */
+                /* T = bit width */
+                /* c = condition type. */
+                /* S = source register. */
+                /* X = value operand type, 0 = main/heap with relative offset, 1 = main/heap with offset register, */
+                /*     2 = register with relative offset, 3 = register with offset register, 4 = static value, 5 = other register. */
+                /* M = memory type. */
+                /* R = address register. */
+                /* a = relative address. */
+                /* r = offset register. */
+                /* X = other register. */
+                /* V = value. */
+                opcode.begin_reg_cond.bit_width = (first_dword >> 20) & 0xF;
+                opcode.begin_reg_cond.cond_type = (ConditionalComparisonType)((first_dword >> 16) & 0xF);
+                opcode.begin_reg_cond.val_reg_index  = ((first_dword >> 12) & 0xF);
+                opcode.begin_reg_cond.comp_type = (CompareRegisterValueType)((first_dword >> 8) & 0xF);
+                
+                switch (opcode.begin_reg_cond.comp_type) {
+                    case CompareRegisterValueType_StaticValue:
+                        opcode.begin_reg_cond.value = GetNextVmInt(opcode.begin_reg_cond.bit_width);
+                        break;
+                    case CompareRegisterValueType_OtherRegister:
+                        opcode.begin_reg_cond.other_reg_index = ((first_dword >> 4) & 0xF);
+                        break;
+                    case CompareRegisterValueType_MemoryRelAddr:
+                        opcode.begin_reg_cond.mem_type = (MemoryAccessType)((first_dword >> 4) & 0xF);
+                        opcode.begin_reg_cond.rel_address = (((u64)(first_dword & 0xF) << 32ul) | ((u64)GetNextDword()));
+                        break;
+                    case CompareRegisterValueType_MemoryOfsReg:
+                        opcode.begin_reg_cond.mem_type = (MemoryAccessType)((first_dword >> 4) & 0xF);
+                        opcode.begin_reg_cond.ofs_reg_index = (first_dword & 0xF);
+                        break;
+                    case CompareRegisterValueType_RegisterRelAddr:
+                        opcode.begin_reg_cond.addr_reg_index = ((first_dword >> 4) & 0xF);
+                        opcode.begin_reg_cond.rel_address = (((u64)(first_dword & 0xF) << 32ul) | ((u64)GetNextDword()));
+                        break;
+                    case CompareRegisterValueType_RegisterOfsReg:
+                        opcode.begin_reg_cond.addr_reg_index = ((first_dword >> 4) & 0xF);
+                        opcode.begin_reg_cond.ofs_reg_index = (first_dword & 0xF);
                         break;
                 }
             }
@@ -373,7 +479,7 @@ void DmntCheatVm::SkipConditionalBlock() {
         const size_t desired_depth = this->condition_depth - 1;
         
         CheatVmOpcode skip_opcode;
-        while (this->DecodeNextOpcode(&skip_opcode) && this->condition_depth > desired_depth) {
+        while (this->condition_depth > desired_depth && this->DecodeNextOpcode(&skip_opcode)) {
             /* Decode instructions until we see end of the current conditional block. */
             /* NOTE: This is broken in gateway's implementation. */
             /* Gateway currently checks for "0x2" instead of "0x20000000" */
@@ -736,6 +842,15 @@ void DmntCheatVm::Execute(const CheatProcessMetadata *metadata) {
                         case StoreRegisterOffsetType_Imm:
                             dst_address += cur_opcode.str_register.rel_address;
                             break;
+                        case StoreRegisterOffsetType_MemReg:
+                            dst_address = GetCheatProcessAddress(metadata, cur_opcode.str_register.mem_type, this->registers[cur_opcode.str_register.addr_reg_index]);
+                            break;
+                        case StoreRegisterOffsetType_MemImm:
+                            dst_address = GetCheatProcessAddress(metadata, cur_opcode.str_register.mem_type, cur_opcode.str_register.rel_address);
+                            break;
+                        case StoreRegisterOffsetType_MemImmReg:
+                            dst_address = GetCheatProcessAddress(metadata, cur_opcode.str_register.mem_type, this->registers[cur_opcode.str_register.addr_reg_index] + cur_opcode.str_register.rel_address);
+                            break;
                     }
                     
                     /* Write value to memory. Write only on valid bitwidth. */
@@ -751,6 +866,101 @@ void DmntCheatVm::Execute(const CheatProcessMetadata *metadata) {
                     /* Increment register if relevant. */
                     if (cur_opcode.str_register.increment_reg) {
                         this->registers[cur_opcode.str_register.addr_reg_index] += cur_opcode.str_register.bit_width;
+                    }
+                }
+                break;
+            case CheatVmOpcodeType_BeginRegisterConditionalBlock:
+                {
+                    /* Get value from register. */
+                    u64 src_value = 0;
+                    switch (cur_opcode.begin_reg_cond.bit_width) {
+                        case 1:
+                            src_value = static_cast<u8>(this->registers[cur_opcode.begin_reg_cond.val_reg_index]  & 0xFFul);
+                            break;
+                        case 2:
+                            src_value = static_cast<u16>(this->registers[cur_opcode.begin_reg_cond.val_reg_index] & 0xFFFFul);
+                            break;
+                        case 4:
+                            src_value = static_cast<u32>(this->registers[cur_opcode.begin_reg_cond.val_reg_index] & 0xFFFFFFFFul);
+                            break;
+                        case 8:
+                            src_value = static_cast<u64>(this->registers[cur_opcode.begin_reg_cond.val_reg_index] & 0xFFFFFFFFFFFFFFFFul);
+                            break;
+                    }
+                    
+                    /* Read value from memory. */
+                    u64 cond_value = 0;
+                    if (cur_opcode.begin_reg_cond.comp_type == CompareRegisterValueType_StaticValue) {
+                        cond_value = GetVmInt(cur_opcode.begin_reg_cond.value, cur_opcode.begin_reg_cond.bit_width);
+                    } else if (cur_opcode.begin_reg_cond.comp_type == CompareRegisterValueType_OtherRegister) {
+                        switch (cur_opcode.begin_reg_cond.bit_width) {
+                            case 1:
+                                cond_value = static_cast<u8>(this->registers[cur_opcode.begin_reg_cond.other_reg_index]  & 0xFFul);
+                                break;
+                            case 2:
+                                cond_value = static_cast<u16>(this->registers[cur_opcode.begin_reg_cond.other_reg_index] & 0xFFFFul);
+                                break;
+                            case 4:
+                                cond_value = static_cast<u32>(this->registers[cur_opcode.begin_reg_cond.other_reg_index] & 0xFFFFFFFFul);
+                                break;
+                            case 8:
+                                cond_value = static_cast<u64>(this->registers[cur_opcode.begin_reg_cond.other_reg_index] & 0xFFFFFFFFFFFFFFFFul);
+                                break;
+                        }
+                    } else {
+                        u64 cond_address = 0;
+                        switch (cur_opcode.begin_reg_cond.comp_type) {
+                            case CompareRegisterValueType_MemoryRelAddr:
+                                cond_address = GetCheatProcessAddress(metadata, cur_opcode.begin_reg_cond.mem_type, cur_opcode.begin_reg_cond.rel_address);
+                                break;
+                            case CompareRegisterValueType_MemoryOfsReg:
+                                cond_address = GetCheatProcessAddress(metadata, cur_opcode.begin_reg_cond.mem_type, this->registers[cur_opcode.begin_reg_cond.ofs_reg_index]);
+                                break;
+                            case CompareRegisterValueType_RegisterRelAddr:
+                                cond_address = this->registers[cur_opcode.begin_reg_cond.addr_reg_index] + cur_opcode.begin_reg_cond.rel_address;
+                                break;
+                            case CompareRegisterValueType_RegisterOfsReg:
+                                cond_address = this->registers[cur_opcode.begin_reg_cond.addr_reg_index] + this->registers[cur_opcode.begin_reg_cond.ofs_reg_index];
+                                break;
+                            default:
+                                break;
+                        }
+                        switch (cur_opcode.begin_reg_cond.bit_width) {
+                            case 1:
+                            case 2:
+                            case 4:
+                            case 8:
+                                DmntCheatManager::ReadCheatProcessMemoryForVm(cond_address, &cond_value, cur_opcode.begin_reg_cond.bit_width);
+                                break;
+                        }
+                    }
+                    
+                    /* Check against condition. */
+                    bool cond_met = false;
+                    switch (cur_opcode.begin_reg_cond.cond_type) {
+                        case ConditionalComparisonType_GT:
+                            cond_met = src_value > cond_value;
+                            break;
+                        case ConditionalComparisonType_GE:
+                            cond_met = src_value >= cond_value;
+                            break;
+                        case ConditionalComparisonType_LT:
+                            cond_met = src_value < cond_value;
+                            break;
+                        case ConditionalComparisonType_LE:
+                            cond_met = src_value <= cond_value;
+                            break;
+                        case ConditionalComparisonType_EQ:
+                            cond_met = src_value == cond_value;
+                            break;
+                        case ConditionalComparisonType_NE:
+                            cond_met = src_value != cond_value;
+                            break;
+                    }
+                    
+                    /* Skip conditional block if condition not met. */
+                    if (!cond_met) {
+                        this->SkipConditionalBlock();
                     }
                 }
                 break;

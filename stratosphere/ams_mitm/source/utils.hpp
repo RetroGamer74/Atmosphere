@@ -42,6 +42,7 @@ struct OverrideKey {
     bool override_by_default;
 };
 
+
 /***********************************************************/
 /* --------- ADDED BY RETROGAMER_74 ************************/
 /***********************************************************/
@@ -73,18 +74,19 @@ class Utils {
         static void InitializeThreadFunc(void *args);
         
         static bool IsHblTid(u64 tid);
+        static bool IsWebAppletTid(u64 tid);
         
         static bool HasTitleFlag(u64 tid, const char *flag);
         static bool HasHblFlag(const char *flag);
         static bool HasGlobalFlag(const char *flag);
         static bool HasFlag(u64 tid, const char *flag);
-        static bool AllowProdinfoWrite(); 
+	static bool AllowProdinfoWrite();        
         static bool HasSdMitMFlag(u64 tid);
         static bool HasSdDisableMitMFlag(u64 tid);
         
         
         static bool IsHidAvailable();
-        static Result GetKeysDown(u64 *keys);
+        static Result GetKeysHeld(u64 *keys);
         
         static OverrideKey GetTitleOverrideKey(u64 tid);
         static bool HasOverrideButton(u64 tid);
@@ -94,5 +96,5 @@ class Utils {
         static Result GetSettingsItemValue(const char *name, const char *key, void *out, size_t max_size, u64 *out_size);
     private:
         static void RefreshConfiguration();
-        static void RefreshProdinfoConfiguration();
+	static void RefreshProdinfoConfiguration();
 };

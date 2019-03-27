@@ -49,7 +49,7 @@ static OverrideProdinfo g_default_override_prodinfo = {
     .allow_write = false
 };
 
-/***********************************************************/
+
 
 struct HblOverrideConfig {
     OverrideKey override_key;
@@ -59,7 +59,7 @@ struct HblOverrideConfig {
 
 static HblOverrideConfig g_hbl_override_config = {
     .override_key = {
-        .key_combination = KEY_R,
+        .key_combination = KEY_L,
         .override_by_default = true
     },
     .title_id = 0x010000000000100D,
@@ -74,7 +74,6 @@ static char g_config_ini_data[0x800];
 /* Static buffer for prodinfo.ini contents at runtime. */
 static char g_config_prodinfo_ini_data[0x800];
 /*******************************************************/
-
 
 /* Backup file for CAL0 partition. */
 static constexpr size_t ProdinfoSize = 0x8000;
@@ -154,12 +153,11 @@ void Utils::InitializeThreadFunc(void *args) {
             
             if (!has_auto_backup) {
                 fsFileSetSize(&g_cal0_file, ProdinfoSize);
-                fsFileWrite(&g_cal0_file, 0, g_cal0_backup, ProdinfoSize);
+                fsFileWrite(&g_cal0_file, 0, g_cal0_storage_backup, ProdinfoSize);
                 fsFileFlush(&g_cal0_file);
             }
             
             /* NOTE: g_cal0_file is intentionally not closed here. This prevents any other process from opening it. */
-
             memset(g_cal0_storage_backup, 0, sizeof(g_cal0_storage_backup));
             memset(g_cal0_backup, 0, sizeof(g_cal0_backup));
         }
@@ -218,6 +216,7 @@ void Utils::InitializeThreadFunc(void *args) {
     
     Utils::RefreshConfiguration();
 
+
     /**** ADDED BY RETROGAMER_74 ********/
     Utils::RefreshProdinfoConfiguration();
     /************************************/
@@ -242,10 +241,7 @@ void Utils::InitializeThreadFunc(void *args) {
         }
         
         g_has_hid_session = true;
-        
-        hidExit();
     }
-    
 }
 
 bool Utils::IsSdInitialized() {
@@ -405,7 +401,11 @@ Result Utils::SaveSdFileForAtmosphere(u64 title_id, const char *fn, void *data, 
 }
 
 bool Utils::IsHblTid(u64 tid) {
-    return (g_hbl_override_config.override_any_app && IsApplicationTid(tid)) || (!g_hbl_override_config.override_any_app && tid == g_hbl_override_config.title_id);
+    return (g_hbl_override_config.override_any_app && IsApplicationTid(tid)) || (tid == g_hbl_override_config.title_id);
+}
+
+bool Utils::IsWebAppletTid(u64 tid) {
+    return tid == 0x010000000000100Aul || tid == 0x010000000000100Ful || tid == 0x0100000000001010ul || tid == 0x0100000000001011ul;
 }
 
 bool Utils::HasTitleFlag(u64 tid, const char *flag) {
@@ -415,14 +415,14 @@ bool Utils::HasTitleFlag(u64 tid, const char *flag) {
         
         memset(flag_path, 0, sizeof(flag_path));
         snprintf(flag_path, sizeof(flag_path) - 1, "flags/%s.flag", flag);
-        if (OpenSdFileForAtmosphere(tid, flag_path, FS_OPEN_READ, &f)) {
+        if (R_SUCCEEDED(OpenSdFileForAtmosphere(tid, flag_path, FS_OPEN_READ, &f))) {
             fsFileClose(&f);
             return true;
         }
         
         /* TODO: Deprecate. */
         snprintf(flag_path, sizeof(flag_path) - 1, "%s.flag", flag);
-        if (OpenSdFileForAtmosphere(tid, flag_path, FS_OPEN_READ, &f)) {
+        if (R_SUCCEEDED(OpenSdFileForAtmosphere(tid, flag_path, FS_OPEN_READ, &f))) {
             fsFileClose(&f);
             return true;
         }
@@ -435,7 +435,7 @@ bool Utils::HasGlobalFlag(const char *flag) {
         FsFile f;
         char flag_path[FS_MAX_PATH] = {0};
         snprintf(flag_path, sizeof(flag_path), "/atmosphere/flags/%s.flag", flag);
-        if (fsFsOpenFile(&g_sd_filesystem, flag_path, FS_OPEN_READ, &f)) {
+        if (R_SUCCEEDED(fsFsOpenFile(&g_sd_filesystem, flag_path, FS_OPEN_READ, &f))) {
             fsFileClose(&f);
             return true;
         }
@@ -453,6 +453,7 @@ bool Utils::HasFlag(u64 tid, const char *flag) {
     return HasTitleFlag(tid, flag) || (IsHblTid(tid) && HasHblFlag(flag));
 }
 
+
 /*********************************************************/
 /****** ADDED BY RETROGAMER_74 ***************************/
 /*********************************************************/
@@ -460,6 +461,7 @@ bool Utils::AllowProdinfoWrite() {
     return g_default_override_prodinfo.allow_write;
 }
 /*********************************************************/
+
 
 bool Utils::HasSdMitMFlag(u64 tid) {
     if (IsHblTid(tid)) {
@@ -479,21 +481,20 @@ bool Utils::HasSdDisableMitMFlag(u64 tid) {
     return false;
 }
 
-Result Utils::GetKeysDown(u64 *keys) {
-    if (!Utils::IsHidAvailable() || R_FAILED(hidInitialize())) {
+Result Utils::GetKeysHeld(u64 *keys) {
+    if (!Utils::IsHidAvailable()) {
         return MAKERESULT(Module_Libnx, LibnxError_InitFail_HID);
     }
     
     hidScanInput();
-    *keys = hidKeysDown(CONTROLLER_P1_AUTO);
+    *keys = hidKeysHeld(CONTROLLER_P1_AUTO);
     
-    hidExit();
     return 0x0;
 }
 
 static bool HasOverrideKey(OverrideKey *cfg) {
     u64 kDown = 0;
-    bool keys_triggered = (R_SUCCEEDED(Utils::GetKeysDown(&kDown)) && ((kDown & cfg->key_combination) != 0));
+    bool keys_triggered = (R_SUCCEEDED(Utils::GetKeysHeld(&kDown)) && ((kDown & cfg->key_combination) != 0));
     return Utils::IsSdInitialized() && (cfg->override_by_default ^ keys_triggered);
 }
 
@@ -515,6 +516,7 @@ bool Utils::HasOverrideButton(u64 tid) {
     return HasOverrideKey(&title_cfg);
 }
 
+
 /*********************************************************/
 /***** ADDED BY RETROGAMER_74 ****************************/
 /*********************************************************/
@@ -527,7 +529,7 @@ static OverrideProdinfo ParseOverrideProdinfo(const char *value) {
         cfg.allow_write = false;
     } else {
         cfg.allow_write = true;
-    }
+    }   
     
     return cfg;
 }
@@ -589,25 +591,28 @@ static OverrideKey ParseOverrideKey(const char *value) {
     return cfg;
 }
 
+/******************RETROGAMER_74 **********************************************/
 static int FsMitmIniHandlerProdinfo(void *user, const char *section, const char *name, const char *value) {
     if(strcasecmp(section, "config") == 0) {
-    	if(strcasecmp(name,"allow_write") == 0)
-		g_default_override_prodinfo = ParseOverrideProdinfo(value);
+        if(strcasecmp(name,"allow_write") == 0)
+                g_default_override_prodinfo = ParseOverrideProdinfo(value);
     }  else {
-	return 0;
+        return 0;
     }
 
     return 1;
 }
+/*********************************************************************************/
 
 static int FsMitmIniHandler(void *user, const char *section, const char *name, const char *value) {
     /* Taken and modified, with love, from Rajkosto's implementation. */
     if (strcasecmp(section, "hbl_config") == 0) {
         if (strcasecmp(name, "title_id") == 0) {
             if (strcasecmp(value, "app") == 0) {
+                /* DEPRECATED */
                 g_hbl_override_config.override_any_app = true;
-            }
-            else {
+                g_hbl_override_config.title_id = 0;
+            } else {
                 u64 override_tid = strtoul(value, NULL, 16);
                 if (override_tid != 0) {
                     g_hbl_override_config.title_id = override_tid;
@@ -615,6 +620,14 @@ static int FsMitmIniHandler(void *user, const char *section, const char *name, c
             }
         } else if (strcasecmp(name, "override_key") == 0) {
             g_hbl_override_config.override_key = ParseOverrideKey(value);
+        } else if (strcasecmp(name, "override_any_app") == 0) {
+            if (strcasecmp(value, "true") == 0 || strcasecmp(value, "1") == 0) {
+                g_hbl_override_config.override_any_app = true;
+            } else if (strcasecmp(value, "false") == 0 || strcasecmp(value, "0") == 0) {
+                g_hbl_override_config.override_any_app = false;
+            } else {
+                /* I guess we default to not changing the value? */
+            }
         }
     } else if (strcasecmp(section, "default_config") == 0) {
         if (strcasecmp(name, "override_key") == 0) {
@@ -675,24 +688,25 @@ void Utils::RefreshProdinfoConfiguration() {
     if (R_FAILED(fsFsOpenFile(&g_sd_filesystem, "/atmosphere/prodinfo.ini", FS_OPEN_READ, &config_file))) {
         return;
     }
-   
+  
     u64 size;
     if (R_FAILED(fsFileGetSize(&config_file, &size))) {
         return;
     }
-   
+  
     size = std::min(size, (decltype(size))0x7FF);
-   
+  
     /* Read in string. */
     std::fill(g_config_prodinfo_ini_data, g_config_prodinfo_ini_data + 0x800, 0);
     size_t r_s;
     fsFileRead(&config_file, 0, g_config_prodinfo_ini_data, size, &r_s);
     fsFileClose(&config_file);
-   
+  
     ini_parse_string(g_config_prodinfo_ini_data, FsMitmIniHandlerProdinfo, NULL);
 }
 
 /****************************************************************/
+
 
 void Utils::RefreshConfiguration() {
     FsFile config_file;
