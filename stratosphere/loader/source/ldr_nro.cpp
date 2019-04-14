@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -20,7 +20,6 @@
 #include <cstdio>
 #include <functional>
 #include <cstring>
-#include "sha256.h"
 #include "ldr_nro.hpp"
 #include "ldr_registration.hpp"
 #include "ldr_map.hpp"
@@ -28,32 +27,31 @@
 
 Result NroUtils::ValidateNrrHeader(NrrHeader *header, u64 size, u64 title_id_min) {
     if (header->magic != MAGIC_NRR0) {
-        return 0x6A09;
+        return ResultLoaderInvalidNrr;
     }
     if (header->nrr_size != size) {
-        return 0xA409;
+        return ResultLoaderInvalidSize;
     }
     
     /* TODO: Check NRR signature. */
     if (false) {
-        return 0x6C09;
+        return ResultLoaderInvalidSignature;
     }
     
     if (header->title_id_min != title_id_min) {
-        return 0x6A09;
+        return ResultLoaderInvalidNrr;
     }
     
-    return 0x0;
+    return ResultSuccess;
 }
 
 Result NroUtils::LoadNro(Registration::Process *target_proc, Handle process_h, u64 nro_heap_address, u64 nro_heap_size, u64 bss_heap_address, u64 bss_heap_size, u64 *out_address) {
-    NroHeader nro_hdr = {0};
-    MappedCodeMemory mcm_nro = {0};
-    MappedCodeMemory mcm_bss = {0};
+    NroHeader nro_hdr = {};
+    MappedCodeMemory mcm_nro = {};
+    MappedCodeMemory mcm_bss = {};
     unsigned int i;
-    Result rc = 0;
+    Result rc = ResultSuccess;
     u8 nro_hash[0x20];
-    struct sha256_state sha_ctx;
 
     /* Perform cleanup on failure. */
     ON_SCOPE_EXIT {
@@ -65,7 +63,7 @@ Result NroUtils::LoadNro(Registration::Process *target_proc, Handle process_h, u
 
     /* Ensure there is an available NRO slot. */
     if (std::all_of(target_proc->nro_infos.begin(), target_proc->nro_infos.end(), std::mem_fn(&Registration::NroInfo::in_use))) {
-        rc = 0x6E09;
+        rc = ResultLoaderInsufficientNroRegistrations;
         return rc;
     }
     for (i = 0; i < 0x200; i++) {
@@ -78,7 +76,7 @@ Result NroUtils::LoadNro(Registration::Process *target_proc, Handle process_h, u
         }
     }
     if (i >= 0x200) {
-        rc = 0x6609;
+        rc = ResultLoaderInsufficientAddressSpace;
         return rc;
     }
 
@@ -92,26 +90,23 @@ Result NroUtils::LoadNro(Registration::Process *target_proc, Handle process_h, u
         nro_hdr = *((NroHeader *)mcm_nro.mapped_address);
 
         if (nro_hdr.magic != MAGIC_NRO0) {
-            rc = 0x6809;
+            rc = ResultLoaderInvalidNro;
             return rc;
         }
         if (nro_hdr.nro_size != nro_heap_size || nro_hdr.bss_size != bss_heap_size) {
-            rc = 0x6809;
+            rc = ResultLoaderInvalidNro;
             return rc;
         }
         if ((nro_hdr.text_size & 0xFFF) || (nro_hdr.ro_size & 0xFFF) || (nro_hdr.rw_size & 0xFFF) || (nro_hdr.bss_size & 0xFFF)) {
-            rc = 0x6809;
+            rc = ResultLoaderInvalidNro;
             return rc;
         }
         if (nro_hdr.text_offset != 0 || nro_hdr.text_offset + nro_hdr.text_size != nro_hdr.ro_offset || nro_hdr.ro_offset + nro_hdr.ro_size != nro_hdr.rw_offset || nro_hdr.rw_offset + nro_hdr.rw_size != nro_hdr.nro_size) {
-            rc = 0x6809;
+            rc = ResultLoaderInvalidNro;
             return rc;
         }
         
-        sha256_init(&sha_ctx);
-        sha256_update(&sha_ctx, (u8 *)mcm_nro.mapped_address, nro_hdr.nro_size);
-        sha256_finalize(&sha_ctx);
-        sha256_finish(&sha_ctx, nro_hash);
+        sha256CalculateHash(nro_hash, mcm_nro.mapped_address, nro_hdr.nro_size);
     }
 
     /* Unmap the NRO. */
@@ -120,12 +115,12 @@ Result NroUtils::LoadNro(Registration::Process *target_proc, Handle process_h, u
     }
     
     if (!Registration::IsNroHashPresent(target_proc->index, nro_hash)) {
-        rc = 0x6C09;
+        rc = ResultLoaderInvalidSignature;
         return rc;
     }
 
     if (Registration::IsNroAlreadyLoaded(target_proc->index, nro_hash)) {
-        rc = 0x7209;
+        rc = ResultLoaderNroAlreadyLoaded;
         return rc;
     }
     
@@ -143,7 +138,7 @@ Result NroUtils::LoadNro(Registration::Process *target_proc, Handle process_h, u
     
     Registration::AddNroToProcess(target_proc->index, &mcm_nro, &mcm_bss, nro_hdr.text_size, nro_hdr.ro_size, nro_hdr.rw_size, nro_hdr.build_id);
     *out_address = mcm_nro.code_memory_address;
-    rc = 0x0;
+    rc = ResultSuccess;
 
     return rc;
 }

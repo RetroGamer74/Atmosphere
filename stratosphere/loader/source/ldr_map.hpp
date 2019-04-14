@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,6 +16,7 @@
  
 #pragma once
 #include <switch.h>
+#include <stratosphere.hpp>
 
 class MapUtils { 
     public:
@@ -71,7 +72,7 @@ class AutoCloseMap {
             this->process_handle = process_h;
             this->base_address = address;
             this->size = size;
-            return 0;
+            return ResultSuccess;
         }
         
         void Close() {
@@ -103,7 +104,7 @@ struct MappedCodeMemory {
     Result Open(Handle process_h, bool is_64_bit_address_space, u64 address, u64 size) {
         Result rc;
         if (this->IsActive()) {
-            return 0x19009;
+            return ResultLoaderInternalError;
         }
         
         this->process_handle = process_h;
@@ -119,7 +120,7 @@ struct MappedCodeMemory {
     Result OpenAtAddress(Handle process_h, u64 address, u64 size, u64 target_code_memory_address) {
         Result rc;
         if (this->IsActive()) {
-            return 0x19009;
+            return ResultLoaderInternalError;
         }
         this->process_handle = process_h;
         this->base_address = address;
@@ -137,7 +138,7 @@ struct MappedCodeMemory {
         Result rc;
         u64 try_address;
         if (this->IsMapped()) {
-            return 0x19009;
+            return ResultLoaderInternalError;
         }
         if (R_FAILED(rc = MapUtils::LocateSpaceForMap(&try_address, size))) {
             return rc;
@@ -152,7 +153,7 @@ struct MappedCodeMemory {
     }
     
     Result Unmap() {
-        Result rc = 0;
+        Result rc = ResultSuccess;
         if (this->IsMapped()) {
             if (R_FAILED((rc = svcUnmapProcessMemory(this->mapped_address, this->process_handle, this->code_memory_address, this->size)))) {
                 /* TODO: panic(). */
@@ -169,6 +170,6 @@ struct MappedCodeMemory {
                 /* TODO: panic(). */
             }
         }
-        *this = (const MappedCodeMemory){0};
+        *this = {};
     }
 };

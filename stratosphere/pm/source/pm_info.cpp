@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,7 +24,7 @@ Result InformationService::GetTitleId(Out<u64> tid, u64 pid) {
     std::shared_ptr<Registration::Process> proc = Registration::GetProcess(pid);
     if (proc != NULL) {
         tid.SetValue(proc->tid_sid.title_id);
-        return 0;
+        return ResultSuccess;
     }
-    return 0x20F;
+    return ResultPmProcessNotFound;
 }

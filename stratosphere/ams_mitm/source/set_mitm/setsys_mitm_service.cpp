@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -90,7 +90,7 @@ Result SetSysMitmService::GetSettingsItemValue(Out<u64> out_size, OutBuffer<u8> 
     }
     
     if (out_value.buffer == nullptr) {
-        return 0x19A69;
+        return ResultSettingsItemValueBufferNull;
     }
     
     if (in_name.num_elements < SET_MAX_NAME_SIZE) {

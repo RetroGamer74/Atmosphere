@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -23,7 +23,6 @@
 #include "debug.hpp"
 #include "utils.hpp"
 #include "ini.h"
-#include "sha256.h"
 
 #include "set_mitm/setsys_settings_items.hpp"
 
@@ -41,6 +40,7 @@ static OverrideKey g_default_override_key = {
     .override_by_default = true
 };
 
+
 /***********************************************************/
 /* --------- ADDED BY RETROGAMER_74 ************************/
 /***********************************************************/
@@ -48,7 +48,6 @@ static OverrideKey g_default_override_key = {
 static OverrideProdinfo g_default_override_prodinfo = {
     .allow_write = false
 };
-
 
 
 struct HblOverrideConfig {
@@ -62,7 +61,7 @@ static HblOverrideConfig g_hbl_override_config = {
         .key_combination = KEY_L,
         .override_by_default = true
     },
-    .title_id = 0x010000000000100D,
+    .title_id = TitleId_AppletPhotoViewer,
     .override_any_app = false
 };
 
@@ -74,6 +73,8 @@ static char g_config_ini_data[0x800];
 /* Static buffer for prodinfo.ini contents at runtime. */
 static char g_config_prodinfo_ini_data[0x800];
 /*******************************************************/
+
+
 
 /* Backup file for CAL0 partition. */
 static constexpr size_t ProdinfoSize = 0x8000;
@@ -140,12 +141,8 @@ void Utils::InitializeThreadFunc(void *args) {
                 u32 cal0_size = ((u32 *)g_cal0_backup)[2];
                 is_cal0_valid &= cal0_size + 0x40 <= ProdinfoSize;
                 if (is_cal0_valid) {
-                    struct sha256_state sha_ctx;
                     u8 calc_hash[0x20];
-                    sha256_init(&sha_ctx);
-                    sha256_update(&sha_ctx, g_cal0_backup + 0x40, cal0_size);
-                    sha256_finalize(&sha_ctx);
-                    sha256_finish(&sha_ctx, calc_hash);
+                    sha256CalculateHash(calc_hash, g_cal0_backup + 0x40, cal0_size);
                     is_cal0_valid &= memcmp(calc_hash, g_cal0_backup + 0x20, sizeof(calc_hash)) == 0;
                 }
                 has_auto_backup = is_cal0_valid;
@@ -216,7 +213,6 @@ void Utils::InitializeThreadFunc(void *args) {
     
     Utils::RefreshConfiguration();
 
-
     /**** ADDED BY RETROGAMER_74 ********/
     Utils::RefreshProdinfoConfiguration();
     /************************************/
@@ -258,7 +254,7 @@ bool Utils::IsHidAvailable() {
 
 Result Utils::OpenSdFile(const char *fn, int flags, FsFile *out) {
     if (!IsSdInitialized()) {
-        return 0xFA202;
+        return ResultFsSdCardNotPresent;
     }
     
     return fsFsOpenFile(&g_sd_filesystem, fn, flags, out);
@@ -266,7 +262,7 @@ Result Utils::OpenSdFile(const char *fn, int flags, FsFile *out) {
 
 Result Utils::OpenSdFileForAtmosphere(u64 title_id, const char *fn, int flags, FsFile *out) {
     if (!IsSdInitialized()) {
-        return 0xFA202;
+        return ResultFsSdCardNotPresent;
     }
     
     char path[FS_MAX_PATH];
@@ -280,7 +276,7 @@ Result Utils::OpenSdFileForAtmosphere(u64 title_id, const char *fn, int flags, F
 
 Result Utils::OpenRomFSSdFile(u64 title_id, const char *fn, int flags, FsFile *out) {
     if (!IsSdInitialized()) {
-        return 0xFA202;
+        return ResultFsSdCardNotPresent;
     }
     
     return OpenRomFSFile(&g_sd_filesystem, title_id, fn, flags, out);
@@ -288,7 +284,7 @@ Result Utils::OpenRomFSSdFile(u64 title_id, const char *fn, int flags, FsFile *o
 
 Result Utils::OpenSdDir(const char *path, FsDir *out) {
     if (!IsSdInitialized()) {
-        return 0xFA202;
+        return ResultFsSdCardNotPresent;
     }
     
     return fsFsOpenDirectory(&g_sd_filesystem, path, FS_DIROPEN_DIRECTORY | FS_DIROPEN_FILE, out);
@@ -296,7 +292,7 @@ Result Utils::OpenSdDir(const char *path, FsDir *out) {
 
 Result Utils::OpenSdDirForAtmosphere(u64 title_id, const char *path, FsDir *out) {
     if (!IsSdInitialized()) {
-        return 0xFA202;
+        return ResultFsSdCardNotPresent;
     }
     
     char safe_path[FS_MAX_PATH];
@@ -310,7 +306,7 @@ Result Utils::OpenSdDirForAtmosphere(u64 title_id, const char *path, FsDir *out)
 
 Result Utils::OpenRomFSSdDir(u64 title_id, const char *path, FsDir *out) {
     if (!IsSdInitialized()) {
-        return 0xFA202;
+        return ResultFsSdCardNotPresent;
     }
     
     return OpenRomFSDir(&g_sd_filesystem, title_id, path, out);
@@ -361,10 +357,10 @@ bool Utils::HasSdRomfsContent(u64 title_id) {
 
 Result Utils::SaveSdFileForAtmosphere(u64 title_id, const char *fn, void *data, size_t size) {
     if (!IsSdInitialized()) {
-        return 0xFA202;
+        return ResultFsSdCardNotPresent;
     }
     
-    Result rc = 0;
+    Result rc = ResultSuccess;
     
     char path[FS_MAX_PATH];
     if (*fn == '/') {
@@ -401,11 +397,11 @@ Result Utils::SaveSdFileForAtmosphere(u64 title_id, const char *fn, void *data, 
 }
 
 bool Utils::IsHblTid(u64 tid) {
-    return (g_hbl_override_config.override_any_app && IsApplicationTid(tid)) || (tid == g_hbl_override_config.title_id);
+    return (g_hbl_override_config.override_any_app && TitleIdIsApplication(tid)) || (tid == g_hbl_override_config.title_id);
 }
 
 bool Utils::IsWebAppletTid(u64 tid) {
-    return tid == 0x010000000000100Aul || tid == 0x010000000000100Ful || tid == 0x0100000000001010ul || tid == 0x0100000000001011ul;
+    return tid == TitleId_AppletWeb || tid == TitleId_AppletOfflineWeb || tid == TitleId_AppletLoginShare || tid == TitleId_AppletWifiWebAuth;
 }
 
 bool Utils::HasTitleFlag(u64 tid, const char *flag) {
@@ -453,7 +449,6 @@ bool Utils::HasFlag(u64 tid, const char *flag) {
     return HasTitleFlag(tid, flag) || (IsHblTid(tid) && HasHblFlag(flag));
 }
 
-
 /*********************************************************/
 /****** ADDED BY RETROGAMER_74 ***************************/
 /*********************************************************/
@@ -489,7 +484,7 @@ Result Utils::GetKeysHeld(u64 *keys) {
     hidScanInput();
     *keys = hidKeysHeld(CONTROLLER_P1_AUTO);
     
-    return 0x0;
+    return ResultSuccess;
 }
 
 static bool HasOverrideKey(OverrideKey *cfg) {
@@ -500,7 +495,7 @@ static bool HasOverrideKey(OverrideKey *cfg) {
 
 
 bool Utils::HasOverrideButton(u64 tid) {
-    if ((!IsApplicationTid(tid)) || (!IsSdInitialized())) {
+    if ((!TitleIdIsApplication(tid)) || (!IsSdInitialized())) {
         /* Disable button override disable for non-applications. */
         return true;
     }
@@ -516,21 +511,20 @@ bool Utils::HasOverrideButton(u64 tid) {
     return HasOverrideKey(&title_cfg);
 }
 
-
 /*********************************************************/
 /***** ADDED BY RETROGAMER_74 ****************************/
 /*********************************************************/
 
 static OverrideProdinfo ParseOverrideProdinfo(const char *value) {
     OverrideProdinfo cfg;
-    
+
     /* Parse on by default. */
     if (value[0] == '0') {
         cfg.allow_write = false;
     } else {
         cfg.allow_write = true;
-    }   
-    
+    }
+
     return cfg;
 }
 /*********************************************************/
@@ -688,24 +682,22 @@ void Utils::RefreshProdinfoConfiguration() {
     if (R_FAILED(fsFsOpenFile(&g_sd_filesystem, "/atmosphere/prodinfo.ini", FS_OPEN_READ, &config_file))) {
         return;
     }
-  
+
     u64 size;
     if (R_FAILED(fsFileGetSize(&config_file, &size))) {
         return;
     }
-  
+
     size = std::min(size, (decltype(size))0x7FF);
-  
+
     /* Read in string. */
     std::fill(g_config_prodinfo_ini_data, g_config_prodinfo_ini_data + 0x800, 0);
     size_t r_s;
     fsFileRead(&config_file, 0, g_config_prodinfo_ini_data, size, &r_s);
     fsFileClose(&config_file);
-  
+
     ini_parse_string(g_config_prodinfo_ini_data, FsMitmIniHandlerProdinfo, NULL);
 }
-
-/****************************************************************/
 
 
 void Utils::RefreshConfiguration() {
@@ -736,4 +728,16 @@ Result Utils::GetSettingsItemValueSize(const char *name, const char *key, u64 *o
 
 Result Utils::GetSettingsItemValue(const char *name, const char *key, void *out, size_t max_size, u64 *out_size) {
     return SettingsItemManager::GetValue(name, key, out, max_size, out_size);
+}
+
+Result Utils::GetSettingsItemBooleanValue(const char *name, const char *key, bool *out) {
+    u8 val = 0;
+    u64 out_size;
+    Result rc = Utils::GetSettingsItemValue(name, key, &val, sizeof(val), &out_size);
+    if (R_SUCCEEDED(rc)) {
+        if (out) {
+            *out = val != 0;
+        }
+    }
+    return rc;
 }

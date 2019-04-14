@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,15 +24,15 @@
 Result DebugMonitorService::GetUnknownStub(Out<u32> count, OutBuffer<u8> out_buf, u64 in_unk) {
     /* This command seems stubbed. */
     if (out_buf.num_elements >> 31) {
-        return 0xC0F;
+        return ResultPmInvalidSize;
     }
     count.SetValue(0);
-    return 0x0;
+    return ResultSuccess;
 }
 
 Result DebugMonitorService::GetDebugProcessIds(Out<u32> count, OutBuffer<u64> out_pids) {
     if (out_pids.num_elements >> 31) {
-        return 0xC0F;
+        return ResultPmInvalidSize;
     }
     return Registration::GetDebugProcessIds(out_pids.buffer, out_pids.num_elements, count.GetPointer());
 }
@@ -47,9 +47,9 @@ Result DebugMonitorService::GetTitleProcessId(Out<u64> pid, u64 tid) {
     std::shared_ptr<Registration::Process> proc = Registration::GetProcessByTitleId(tid);
     if (proc != nullptr) {
         pid.SetValue(proc->pid);
-        return 0;
+        return ResultSuccess;
     }
-    return 0x20F;
+    return ResultPmProcessNotFound;
 }
 
 Result DebugMonitorService::EnableDebugForTitleId(Out<CopiedHandle> event, u64 tid) {
@@ -62,9 +62,9 @@ Result DebugMonitorService::GetApplicationProcessId(Out<u64> pid) {
     std::shared_ptr<Registration::Process> app_proc;
     if (Registration::HasApplicationProcess(&app_proc)) {
         pid.SetValue(app_proc->pid);
-        return 0x0;
+        return ResultSuccess;
     }
-    return 0x20F;
+    return ResultPmProcessNotFound;
 }
 
 Result DebugMonitorService::EnableDebugForApplication(Out<CopiedHandle> event) {
@@ -81,15 +81,15 @@ Result DebugMonitorService::AtmosphereGetProcessInfo(Out<CopiedHandle> proc_hand
     if (proc != nullptr) {
         proc_hand.SetValue(proc->handle);
         tid_sid.SetValue(proc->tid_sid);
-        return 0;
+        return ResultSuccess;
     }
-    return 0x20F;
+    return ResultPmProcessNotFound;
 }
 
 Result DebugMonitorService::AtmosphereGetCurrentLimitInfo(Out<u64> cur_val, Out<u64> lim_val, u32 category, u32 resource) {
     Result rc;
     if(category > ResourceLimitUtils::ResourceLimitCategory::ResourceLimitCategory_Applet) {
-        return 0xF001;
+        return ResultKernelInvalidEnumValue;
     }
 
     Handle limit_h = ResourceLimitUtils::GetResourceLimitHandleByCategory((ResourceLimitUtils::ResourceLimitCategory) category);
@@ -104,5 +104,5 @@ Result DebugMonitorService::AtmosphereGetCurrentLimitInfo(Out<u64> cur_val, Out<
         return rc;
     }
 
-    return 0;
+    return ResultSuccess;
 }

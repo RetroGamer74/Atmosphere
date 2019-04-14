@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -89,13 +89,13 @@ static void DoRebootToPayload() {
 Result BpcRebootManager::PerformReboot() {
     switch (g_reboot_type) {
         case BpcRebootType::Standard:
-            return RESULT_FORWARD_TO_SESSION;
+            return ResultAtmosphereMitmShouldForwardToSession;
         case BpcRebootType::ToRcm:
             RebootToRcm();
-            return 0;
+            return ResultSuccess;
         case BpcRebootType::ToPayload:
         default:
             DoRebootToPayload();
-            return 0;
+            return ResultSuccess;
     }
 }

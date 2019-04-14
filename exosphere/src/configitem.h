@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -32,7 +32,7 @@ typedef enum {
     CONFIGITEM_BOOTREASON = 9,
     CONFIGITEM_MEMORYARRANGE = 10,
     CONFIGITEM_ISDEBUGMODE = 11,
-    CONFIGITEM_KERNELMEMORYCONFIGURATION = 12,
+    CONFIGITEM_KERNELCONFIGURATION = 12,
     CONFIGITEM_BATTERYPROFILE = 13,
     CONFIGITEM_ISQUESTUNIT = 14,
     CONFIGITEM_NEWHARDWARETYPE_5X = 15,
@@ -43,6 +43,8 @@ typedef enum {
     CONFIGITEM_EXOSPHERE_VERSION = 65000,
     CONFIGITEM_NEEDS_REBOOT = 65001,
     CONFIGITEM_NEEDS_SHUTDOWN = 65002,
+    CONFIGITEM_EXOSPHERE_VERHASH = 65003,
+    CONFIGITEM_HAS_RCM_BUG_PATCH = 65004,
 } ConfigItem;
 
 #define REBOOT_KIND_NO_REBOOT     0

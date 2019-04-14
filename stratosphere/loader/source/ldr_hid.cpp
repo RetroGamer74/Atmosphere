@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -21,7 +21,7 @@
 #include "ldr_hid.hpp"
 
 Result HidManagement::GetKeysHeld(u64 *keys) {
-    if (!ContentManagement::HasCreatedTitle(0x0100000000000013)) {
+    if (!ContentManagement::HasCreatedTitle(TitleId_Hid)) {
         return MAKERESULT(Module_Libnx, LibnxError_InitFail_HID);
     }
     
@@ -32,5 +32,5 @@ Result HidManagement::GetKeysHeld(u64 *keys) {
     hidScanInput();
     *keys = hidKeysHeld(CONTROLLER_P1_AUTO);
     
-    return 0x0;
+    return ResultSuccess;
 }

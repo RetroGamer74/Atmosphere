@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -38,8 +38,8 @@ Result MapUtils::MapCodeMemoryForProcess(Handle process_h, bool is_64_bit_addres
 }
 
 Result MapUtils::LocateSpaceForMapModern(u64 *out, u64 out_size) {
-    MemoryInfo mem_info = {0};
-    AddressSpaceInfo address_space = {0};
+    MemoryInfo mem_info = {};
+    AddressSpaceInfo address_space = {};
     u32 page_info = 0;
     u64 cur_base = 0, cur_end = 0;
     Result rc;
@@ -50,7 +50,7 @@ Result MapUtils::LocateSpaceForMapModern(u64 *out, u64 out_size) {
     
     cur_base = address_space.addspace_base;
     
-    rc = 0xD001;
+    rc = ResultKernelOutOfMemory;
     cur_end = cur_base + out_size;
     if (cur_end <= cur_base) {
         return rc;
@@ -75,7 +75,7 @@ Result MapUtils::LocateSpaceForMapModern(u64 *out, u64 out_size) {
             }
             if (mem_info.type == 0 && mem_info.addr - cur_base + mem_info.size >= out_size) {
                 *out = cur_base;
-                return 0x0;
+                return ResultSuccess;
             }
             if (mem_info.addr + mem_info.size <= cur_base) {
                 return rc;
@@ -94,7 +94,7 @@ Result MapUtils::LocateSpaceForMapModern(u64 *out, u64 out_size) {
 
 
 Result MapUtils::LocateSpaceForMapDeprecated(u64 *out, u64 out_size) {
-    MemoryInfo mem_info = {0};
+    MemoryInfo mem_info = {};
     u32 page_info = 0;
     Result rc;
     
@@ -103,14 +103,14 @@ Result MapUtils::LocateSpaceForMapDeprecated(u64 *out, u64 out_size) {
         return rc;
     }
     
-    rc = 0xD001;
+    rc = ResultKernelOutOfMemory;
     while (true) {
         if (mem_info.type == 0x10) {
                 return rc;
         }
         if (mem_info.type == 0 && mem_info.addr - cur_base + mem_info.size >= out_size) {
             *out = cur_base;
-            return 0x0;
+            return ResultSuccess;
         }
         u64 mem_end = mem_info.addr + mem_info.size;
         if (mem_end < cur_base) {
@@ -128,7 +128,7 @@ Result MapUtils::LocateSpaceForMapDeprecated(u64 *out, u64 out_size) {
 }
 
 Result MapUtils::MapCodeMemoryForProcessModern(Handle process_h, u64 base_address, u64 size, u64 *out_code_memory_address) {
-    AddressSpaceInfo address_space = {0};
+    AddressSpaceInfo address_space = {};
     Result rc;
     
     if (R_FAILED((rc = GetAddressSpaceInfo(&address_space, process_h)))) {
@@ -136,7 +136,7 @@ Result MapUtils::MapCodeMemoryForProcessModern(Handle process_h, u64 base_addres
     }
 
     if (size > address_space.addspace_size) {
-        return 0x6609;
+        return ResultLoaderInsufficientAddressSpace;
     }
     
     u64 try_address;
@@ -152,7 +152,7 @@ Result MapUtils::MapCodeMemoryForProcessModern(Handle process_h, u64 base_addres
             break;
         }
         rc = svcMapProcessCodeMemory(process_h, try_address, base_address, size);
-        if (rc != 0xD401) {
+        if (rc != ResultKernelInvalidMemoryState) {
             break;
         }
     }
@@ -174,14 +174,14 @@ Result MapUtils::MapCodeMemoryForProcessDeprecated(Handle process_h, bool is_64_
     }
     
     if (size > addspace_size) {
-        return 0x6609;
+        return ResultLoaderInsufficientAddressSpace;
     }
         
     u64 try_address;
     for (unsigned int i = 0; i < 0x200; i++) {
         try_address = addspace_base + (RandomUtils::GetRandomU64((u64)(addspace_size - size) >> 12) << 12);
         rc = svcMapProcessCodeMemory(process_h, try_address, base_address, size);
-        if (rc != 0xD401) {
+        if (rc != ResultKernelInvalidMemoryState) {
             break;
         }
     }
@@ -214,5 +214,5 @@ Result MapUtils::GetAddressSpaceInfo(AddressSpaceInfo *out, Handle process_h) {
     out->heap_end = out->heap_base + out->heap_size;
     out->map_end = out->map_base + out->map_size;
     out->addspace_end = out->addspace_base + out->addspace_size;
-    return 0;
+    return ResultSuccess;
 }

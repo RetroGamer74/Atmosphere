@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -27,7 +27,7 @@ void BpcMitmService::PostProcess(IMitmServiceObject *obj, IpcResponseContext *ct
 Result BpcMitmService::ShutdownSystem() {
     /* Use exosphere + reboot to perform real shutdown, instead of fake shutdown. */
     PerformShutdownSmc();
-    return 0;
+    return ResultSuccess;
 }
 
 Result BpcMitmService::RebootSystem() {

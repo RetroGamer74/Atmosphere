@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -18,8 +18,6 @@
 #include <switch.h>
 #include <stratosphere.hpp>
 #include "fs_shim.h"
-
-#include "fs_results.hpp"
 
 #include "../debug.hpp"
 
@@ -104,7 +102,7 @@ class IROStorage : public IStorage {
             return ResultFsUnsupportedOperation;
         };
         virtual Result Flush() final {
-            return 0x0;
+            return ResultSuccess;
         };
         virtual Result SetSize(u64 size) final {
             (void)(size);

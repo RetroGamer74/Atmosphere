@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -37,7 +37,7 @@ class BpcMitmService : public IMitmServiceObject {
              * - fatal, to simplify payload reboot logic significantly
              * - applications, to allow homebrew to take advantage of the feature.
              */
-            return tid == 0x0100000000000023ull || tid == 0x0100000000000034ull || Utils::IsHblTid(tid);
+            return tid == TitleId_Am || tid == TitleId_Fatal || TitleIdIsApplication(tid) || Utils::IsHblTid(tid);
         }
         
         static void PostProcess(IMitmServiceObject *obj, IpcResponseContext *ctx);

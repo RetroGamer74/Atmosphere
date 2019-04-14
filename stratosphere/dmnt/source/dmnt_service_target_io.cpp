@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -38,7 +38,7 @@ static std::unordered_map<u64, FsFile> g_file_handles;
 static Result EnsureSdInitialized() {
     std::scoped_lock<HosMutex> lk(g_sd_lock);
     if (g_sd_initialized) {
-        return 0;
+        return ResultSuccess;
     }
     
     Result rc = fsMountSdcard(&g_sd_fs);
@@ -60,9 +60,9 @@ static Result GetFileByHandle(FsFile *out, u64 handle) {
     std::scoped_lock<HosMutex> lk(g_file_handle_lock);
     if (g_file_handles.find(handle) != g_file_handles.end()) {
         *out = g_file_handles[handle];
-        return 0;
+        return ResultSuccess;
     }
-    return 0x2EE202;
+    return ResultFsInvalidArgument;
 }
 
 static Result CloseFileByHandle(u64 handle) {
@@ -70,9 +70,9 @@ static Result CloseFileByHandle(u64 handle) {
     if (g_file_handles.find(handle) != g_file_handles.end()) {
         fsFileClose(&g_file_handles[handle]);
         g_file_handles.erase(handle);
-        return 0;
+        return ResultSuccess;
     }
-    return 0x2EE202;
+    return ResultFsInvalidArgument;
 }
 
 static void FixPath(char *dst, size_t dst_size, InBuffer<char> &path) {
@@ -104,7 +104,8 @@ static void FixPath(char *dst, size_t dst_size, InBuffer<char> &path) {
 
 Result DebugMonitorService::TargetIO_FileOpen(OutBuffer<u64> out_hnd, InBuffer<char> path, int open_mode, u32 create_mode) {
     if (out_hnd.num_elements != 1) {
-        return 0xF601;
+        /* Serialization error. */
+        return ResultKernelConnectionClosed;
     }
     
     Result rc = EnsureSdInitialized();
@@ -151,7 +152,8 @@ Result DebugMonitorService::TargetIO_FileOpen(OutBuffer<u64> out_hnd, InBuffer<c
 
 Result DebugMonitorService::TargetIO_FileClose(InBuffer<u64> hnd) {
     if (hnd.num_elements != 1) {
-        return 0xF601;
+        /* Serialization error. */
+        return ResultKernelConnectionClosed;
     }
     
     return CloseFileByHandle(hnd[0]);
@@ -159,7 +161,8 @@ Result DebugMonitorService::TargetIO_FileClose(InBuffer<u64> hnd) {
 
 Result DebugMonitorService::TargetIO_FileRead(InBuffer<u64> hnd, OutBuffer<u8, BufferType_Type1> out_data, Out<u32> out_read, u64 offset) {
     if (hnd.num_elements != 1) {
-        return 0xF601;
+        /* Serialization error. */
+        return ResultKernelConnectionClosed;
     }
     
     FsFile f;
@@ -176,7 +179,8 @@ Result DebugMonitorService::TargetIO_FileRead(InBuffer<u64> hnd, OutBuffer<u8, B
 
 Result DebugMonitorService::TargetIO_FileWrite(InBuffer<u64> hnd, InBuffer<u8, BufferType_Type1> data, Out<u32> out_written, u64 offset) {
     if (hnd.num_elements != 1) {
-        return 0xF601;
+        /* Serialization error. */
+        return ResultKernelConnectionClosed;
     }
     
     FsFile f;
@@ -195,13 +199,14 @@ Result DebugMonitorService::TargetIO_FileWrite(InBuffer<u64> hnd, InBuffer<u8, B
 
 Result DebugMonitorService::TargetIO_FileSetAttributes(InBuffer<char> path, InBuffer<u8> attributes) {
     /* I don't really know why this command exists, Horizon doesn't allow you to set any attributes. */
-    /* N just returns 0x0 unconditionally here. */
-    return 0x0;
+    /* N just returns ResultSuccess unconditionally here. */
+    return ResultSuccess;
 }
 
 Result DebugMonitorService::TargetIO_FileGetInformation(InBuffer<char> path, OutBuffer<u64> out_info, Out<int> is_directory) {
     if (out_info.num_elements != 4) {
-        return 0xF601;
+        /* Serialization error. */
+        return ResultKernelConnectionClosed;
     }
     
     Result rc = EnsureSdInitialized();
@@ -240,7 +245,7 @@ Result DebugMonitorService::TargetIO_FileGetInformation(InBuffer<char> path, Out
 
 Result DebugMonitorService::TargetIO_FileSetTime(InBuffer<char> path, u64 create, u64 access, u64 modify) {
     /* This is another function that doesn't really need to exist, because Horizon doesn't let you set anything. */
-    return 0x0;
+    return ResultSuccess;
 }
 
 Result DebugMonitorService::TargetIO_FileSetSize(InBuffer<char> input, u64 size) {

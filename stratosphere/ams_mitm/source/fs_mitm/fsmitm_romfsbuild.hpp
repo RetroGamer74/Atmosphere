@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -81,7 +81,9 @@ struct RomFSSourceInfo {
             case RomFSDataSource::MetaData:
             case RomFSDataSource::Memory:
             default:
-                fatalSimple(0xF601);
+                /* TODO: Better error. */
+                fatalSimple(ResultKernelConnectionClosed);
+                break;
         }
     }
     
@@ -97,7 +99,9 @@ struct RomFSSourceInfo {
             case RomFSDataSource::BaseRomFS:
             case RomFSDataSource::FileRomFS:
             default:
-                fatalSimple(0xF601);
+                /* TODO: Better error. */
+                fatalSimple(ResultKernelConnectionClosed);
+                break;
         }
     }
     
@@ -110,7 +114,9 @@ struct RomFSSourceInfo {
             case RomFSDataSource::BaseRomFS:
             case RomFSDataSource::FileRomFS:
             default:
-                fatalSimple(0xF601);
+                /* TODO: Better error. */
+                fatalSimple(ResultKernelConnectionClosed);
+                break;
         }
     }
     
@@ -127,7 +133,9 @@ struct RomFSSourceInfo {
                 std::free((void*)this->memory_source_info.data);
                 break;
             default:
-                fatalSimple(0xF601);
+                /* TODO: Better error. */
+                fatalSimple(ResultKernelConnectionClosed);
+                break;
         }
     }
     

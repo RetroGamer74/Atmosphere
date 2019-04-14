@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -126,12 +126,13 @@ void FontManager::PrintLine(const char *str) {
 }
 
 void FontManager::PrintFormatLine(const char *format, ...) {
+    char char_buf[0x400];
+
     va_list va_arg;
     va_start(va_arg, format);
-    
-    char char_buf[0x400];
     vsnprintf(char_buf, sizeof(char_buf), format, va_arg);
-    
+    va_end(va_arg);
+
     PrintLine(char_buf);
 }
 
@@ -140,12 +141,13 @@ void FontManager::Print(const char *str) {
 }
 
 void FontManager::PrintFormat(const char *format, ...) {
+    char char_buf[0x400];
+
     va_list va_arg;
     va_start(va_arg, format);
-    
-    char char_buf[0x400];
     vsnprintf(char_buf, sizeof(char_buf), format, va_arg);
-    
+    va_end(va_arg);
+
     Print(char_buf);
 }
 

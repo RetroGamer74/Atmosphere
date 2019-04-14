@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -38,11 +38,11 @@ Result FatalEventManager::GetEvent(Handle *out) {
     
     /* Only allow GetEvent to succeed NumFatalEvents times. */
     if (this->events_gotten >= FatalEventManager::NumFatalEvents) {
-        return FatalResult_TooManyEvents;
+        return ResultFatalTooManyEvents;
     }
     
     *out = this->events[this->events_gotten++].revent;
-    return 0;
+    return ResultSuccess;
 }
 
 void FatalEventManager::SignalEvents() {

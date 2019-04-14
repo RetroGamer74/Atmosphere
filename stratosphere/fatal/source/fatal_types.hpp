@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -17,14 +17,6 @@
 #pragma once
 #include <switch.h>
 #include <stratosphere.hpp>
-
-enum FatalResult : Result {
-    FatalResult_NullGfxBuffer = 0x4A3,
-    FatalResult_AlreadyThrown = 0x6A3,
-    FatalResult_TooManyEvents = 0x8A3,
-    FatalResult_InRepairWithoutVolHeld = 0xAA3,
-    FatalResult_InRepairWithoutTimeReviserCartridge = 0xCA3,
-};
 
 static constexpr size_t NumAarch64Gprs = 32;
 static constexpr size_t NumAarch32Gprs = 16;

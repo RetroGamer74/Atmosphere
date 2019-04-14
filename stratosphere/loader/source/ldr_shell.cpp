@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -43,7 +43,7 @@ Result ShellService::SetExternalContentSource(Out<MovedHandle> out, u64 tid) {
     serviceCreate(&service, client_h);
     ContentManagement::SetExternalContentSource(tid, FsFileSystem {service});
     out.SetValue(server_h);
-    return 0;
+    return ResultSuccess;
 }
 
 void ShellService::ClearExternalContentSource(u64 tid) {

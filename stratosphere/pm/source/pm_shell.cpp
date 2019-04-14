@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -34,7 +34,7 @@ Result ShellService::TerminateProcessId(u64 pid) {
     if (proc != nullptr) {
         return svcTerminateProcess(proc->handle);
     } else {
-        return 0x20F;
+        return ResultPmProcessNotFound;
     }
 }
 
@@ -45,7 +45,7 @@ Result ShellService::TerminateTitleId(u64 tid) {
     if (proc != NULL) {
         return svcTerminateProcess(proc->handle);
     } else {
-        return 0x20F;
+        return ResultPmProcessNotFound;
     }
 }
 
@@ -62,12 +62,12 @@ Result ShellService::FinalizeExitedProcess(u64 pid) {
     
     auto proc = Registration::GetProcess(pid);
     if (proc == NULL) {
-        return 0x20F;
+        return ResultPmProcessNotFound;
     } else if (proc->state != ProcessState_Exited) {
-        return 0x60F;
+        return ResultPmNotExited;
     } else {
         Registration::FinalizeExitedProcess(proc);
-        return 0x0;
+        return ResultSuccess;
     }
 }
 
@@ -77,9 +77,9 @@ Result ShellService::ClearProcessNotificationFlag(u64 pid) {
     auto proc = Registration::GetProcess(pid);
     if (proc != NULL) {
         proc->flags &= ~PROCESSFLAGS_CRASHED;
-        return 0x0;
+        return ResultSuccess;
     } else {
-        return 0x20F;
+        return ResultPmProcessNotFound;
     }
 }
 
@@ -96,9 +96,9 @@ Result ShellService::GetApplicationProcessId(Out<u64> pid) {
     std::shared_ptr<Registration::Process> app_proc;
     if (Registration::HasApplicationProcess(&app_proc)) {
         pid.SetValue(app_proc->pid);
-        return 0;
+        return ResultSuccess;
     }
-    return 0x20F;
+    return ResultPmProcessNotFound;
 }
 
 Result ShellService::BoostSystemMemoryResourceLimit(u64 sysmem_size) {
@@ -109,5 +109,5 @@ Result ShellService::BoostSystemThreadsResourceLimit() {
     /* Starting in 7.0.0, Nintendo reduces the number of system threads from 0x260 to 0x60, */
     /* Until this command is called to double that amount to 0xC0. */
     /* We will simply not reduce the number of system threads available for no reason. */
-    return 0x0;
+    return ResultSuccess;
 }

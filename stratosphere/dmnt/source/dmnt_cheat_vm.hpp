@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -43,6 +43,8 @@ enum CheatVmOpcodeType : u32 {
     
     /* Extended width opcodes. */
     CheatVmOpcodeType_BeginRegisterConditionalBlock = 0xC0,
+    CheatVmOpcodeType_SaveRestoreRegister = 0xC1,
+    CheatVmOpcodeType_SaveRestoreRegisterMask = 0xC2,
 };
 
 enum MemoryAccessType : u32 {
@@ -91,6 +93,13 @@ enum CompareRegisterValueType : u32 {
     CompareRegisterValueType_RegisterOfsReg = 3,
     CompareRegisterValueType_StaticValue = 4,
     CompareRegisterValueType_OtherRegister = 5,
+};
+
+enum SaveRestoreRegisterOpType : u32 {
+    SaveRestoreRegisterOpType_Restore = 0,
+    SaveRestoreRegisterOpType_Save = 1,
+    SaveRestoreRegisterOpType_ClearSaved = 2,
+    SaveRestoreRegisterOpType_ClearRegs = 3,
 };
 
 union VmInt {
@@ -191,6 +200,16 @@ struct BeginRegisterConditionalOpcode {
     VmInt value;
 };
 
+struct SaveRestoreRegisterOpcode {
+    u32 dst_index;
+    u32 src_index;
+    SaveRestoreRegisterOpType op_type;
+};
+
+struct SaveRestoreRegisterMaskOpcode {
+    SaveRestoreRegisterOpType op_type;
+    bool should_operate[0x10];
+};
 
 struct CheatVmOpcode {
     CheatVmOpcodeType opcode;
@@ -208,6 +227,8 @@ struct CheatVmOpcode {
         PerformArithmeticRegisterOpcode perform_math_reg;
         StoreRegisterToAddressOpcode str_register;
         BeginRegisterConditionalOpcode begin_reg_cond;
+        SaveRestoreRegisterOpcode save_restore_reg;
+        SaveRestoreRegisterMaskOpcode save_restore_regmask;
     };
 };
 
@@ -222,6 +243,7 @@ class DmntCheatVm {
         bool decode_success = false;
         u32 program[MaximumProgramOpcodeCount] = {0};
         u64 registers[NumRegisters] = {0};
+        u64 saved_values[NumRegisters] = {0};
         size_t loop_tops[NumRegisters] = {0};
     private:
         bool DecodeNextOpcode(CheatVmOpcode *out);

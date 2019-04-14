@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -39,7 +39,7 @@ class SectoredProxyStorage : public ProxyStorage {
         SectoredProxyStorage(FsStorage s) : ProxyStorage(s) { }
     public:
         virtual Result Read(void *_buffer, size_t size, u64 offset) override {
-            Result rc = 0;
+            Result rc = ResultSuccess;
             u8 *buffer = static_cast<u8 *>(_buffer);
             this->Seek(offset);
             
@@ -82,7 +82,7 @@ class SectoredProxyStorage : public ProxyStorage {
             return rc;
         };
         virtual Result Write(void *_buffer, size_t size, u64 offset) override {
-            Result rc = 0;
+            Result rc = ResultSuccess;
             u8 *buffer = static_cast<u8 *>(_buffer);
             this->Seek(offset);
             

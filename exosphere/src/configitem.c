@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Atmosphère-NX
+ * Copyright (c) 2018-2019 Atmosphère-NX
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -206,8 +206,13 @@ uint32_t configitem_get(bool privileged, ConfigItem item, uint64_t *p_outvalue) 
                 *p_outvalue = (int)(bootconfig_is_debug_mode());
             }
             break;
-        case CONFIGITEM_KERNELMEMORYCONFIGURATION:
-            *p_outvalue = bootconfig_get_kernel_memory_configuration();
+        case CONFIGITEM_KERNELCONFIGURATION:
+            {
+                uint64_t config = bootconfig_get_kernel_configuration();
+                /* Always enable usermode exception handlers. */
+                config |= KERNELCONFIGFLAG_ENABLE_USER_EXCEPTION_HANDLERS;
+                *p_outvalue = config;
+            }
             break;
         case CONFIGITEM_BATTERYPROFILE:
             *p_outvalue = (int)g_battery_profile;
@@ -259,6 +264,14 @@ uint32_t configitem_get(bool privileged, ConfigItem item, uint64_t *p_outvalue) 
         case CONFIGITEM_NEEDS_SHUTDOWN:
             /* UNOFFICIAL: The fact that we are executing means we aren't in the process of shutting down. */
             *p_outvalue = 0;
+            break;
+        case CONFIGITEM_EXOSPHERE_VERHASH:
+            /* UNOFFICIAL: Gets information about the current exosphere git commit hash. */
+            *p_outvalue = ATMOSPHERE_RELEASE_VERSION_HASH;
+            break;
+        case CONFIGITEM_HAS_RCM_BUG_PATCH:
+            /* UNOFFICIAL: Gets whether this unit has the RCM bug patched. */
+            *p_outvalue = (int)(fuse_has_rcm_bug_patch());;
             break;
         default:
             result = 2;
